@@ -7,13 +7,13 @@ GitHub Actions ke free runner par chalta hai, ya apne laptop par:
     python tools/cpu_llm.py "ek chhoti kahani likho jungle ke baare me"
 
 Model pehli baar download hota hai (~400MB), phir cache me rehta hai.
-Sach: 0.5B model chhota hai — chhoti lines theek, lambi kahani kamzor.
+Sach: 1.5B model chhota hai — chhoti lines theek, lambi kahani kamzor. 0.5B se behtar.
 """
 import os
 import sys
 
-MODEL_REPO = "Qwen/Qwen2.5-0.5B-Instruct-GGUF"
-MODEL_FILE = "qwen2.5-0.5b-instruct-q4_k_m.gguf"
+MODEL_REPO = "Qwen/Qwen2.5-1.5B-Instruct-GGUF"
+MODEL_FILE = "qwen2.5-1.5b-instruct-q4_k_m.gguf"
 MODEL_DIR = os.environ.get("MODEL_DIR", "models")
 
 
