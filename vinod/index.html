@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Vinod v9 — asli diagnostic</title>
+<title>Agent Vinod v10 — keys kabhi na jaayein</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -46,7 +46,7 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
 </head>
 <body>
 <div class="wrap">
-  <h1>Agent Vinod <span style="font-size:11px;color:var(--green);font-family:'Azeret Mono',monospace">v9 DIAG</span></h1>
+  <h1>Agent Vinod <span style="font-size:11px;color:var(--green);font-family:'Azeret Mono',monospace">v10 SAFE</span></h1>
   <div class="sub">Seetal ka worker — bada kaam karta hai, jhooth nahi bolta. Result ek "card" me deta hai jo Seetal ko wapas diya ja sakta hai.</div>
 
   <div class="card">
@@ -72,6 +72,7 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
         <button id="impKeys" style="padding:8px 12px;font-size:12.5px">backup wapas lao</button>
         <input id="impFile" type="file" accept=".json" style="display:none">
       </div>
+      <div class="msg info show" id="savedInfo" style="margin-top:8px">—</div>
       <div class="msg" id="testMsg" style="margin-top:8px"></div>
       <div id="diag" style="margin-top:8px"></div>
       <div class="msg info show" style="margin-top:8px">Keys isi browser me hamesha ke liye rehti hain — refresh, naya version, ya doosri app kholne par bhi milengi. Ek baar backup file le lo, phir browser data saaf karne par bhi kuch nahi jayega.</div>
@@ -135,6 +136,7 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
    key dobara nahi daalni padti. */
 const KSTORE="seetal-keys-v1";
 const LEGACY="vinod-keys-v1";
+const MIRROR="seetal-keys-mirror-v1";
 const PROVIDERS=[
   {id:"groq",      name:"Groq",      kind:"openai", base:"https://api.groq.com/openai/v1",   model:"qwen/qwen3.8-27b"},
   {id:"openai",    name:"OpenAI",    kind:"openai", base:"https://api.openai.com/v1",        model:"gpt-4o-mini"},
@@ -154,6 +156,11 @@ const ALLOW=["raw.githubusercontent.com","en.wikipedia.org","api.github.com","da
 let keys={}, health={}, models={}, lastCard="";
 (function loadKeys(){
   try{ const s=JSON.parse(localStorage.getItem(KSTORE)||"{}"); keys=s.keys||{}; health=s.health||{}; models=s.models||{}; }catch(e){}
+  // primary khaali ho gaya? mirror se wapas laao
+  if(!Object.keys(keys).length){
+    try{ const m=JSON.parse(localStorage.getItem(MIRROR)||"{}");
+      if(m.keys && Object.keys(m.keys).length){ keys=m.keys; health=m.health||{}; models=m.models||{}; } }catch(e){}
+  }
   // purane Vinod store se keys utha kar merge karo (kuch na khoye)
   try{
     const old=JSON.parse(localStorage.getItem(LEGACY)||"{}");
@@ -163,7 +170,12 @@ let keys={}, health={}, models={}, lastCard="";
   // merge ko pakka karo — ab sab kuch ek hi store me
   try{ localStorage.setItem(KSTORE, JSON.stringify({keys,health,models})); }catch(e){}
 })();
-const save=()=>{ try{ localStorage.setItem(KSTORE, JSON.stringify({keys,health,models})); }catch(e){} };
+const save=()=>{
+  const payload=JSON.stringify({keys,health,models,custom:(typeof custom!=="undefined"?custom:[])});
+  try{ localStorage.setItem(KSTORE, payload); }catch(e){}
+  try{ localStorage.setItem(MIRROR, payload); }catch(e){}   /* doosri copy — ek ud jaye to doosri bachi rahe */
+  try{ paintSaved(); }catch(e){}
+};
 
 const provEl=document.getElementById("prov"), msg=document.getElementById("msg"), outEl=document.getElementById("out");
 const taskEl=document.getElementById("task"), modeEl=document.getElementById("mode"), selEl=document.getElementById("modelSel");
@@ -190,6 +202,14 @@ function renderProvRows(){
   });
 }
 renderProvRows();
+function paintSaved(){
+  const el=document.getElementById("savedInfo"); if(!el) return;
+  const n=Object.keys(keys).filter(k=>keys[k]).length;
+  let bk="kabhi nahi"; try{ bk=localStorage.getItem("vinod-last-backup")||"kabhi nahi"; }catch(e){}
+  el.textContent="Keys saved: "+n+" · isi browser me hamesha · last backup: "+bk+
+    (n?" — ek baar 'keys ka backup lo' dabao, phir browser data saaf karne par bhi kuch nahi jayega":"");
+}
+
 function paint(){
   const prov=allProviders();
   prov.forEach(p=>{
@@ -540,6 +560,8 @@ document.getElementById("expKeys").onclick=()=>{
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a"); a.href=url; a.download="vinod-keys-backup.json";
   document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},3000);
+  try{ localStorage.setItem("vinod-last-backup", new Date().toISOString().slice(0,10)); }catch(e){}
+  paintSaved();
   show("ok","Backup file download ho gayi — sambhal ke rakho.");
 };
 document.getElementById("impKeys").onclick=()=>document.getElementById("impFile").click();
@@ -560,6 +582,9 @@ document.getElementById("copyCard").onclick=async()=>{
   try{ await navigator.clipboard.writeText(lastCard); show("ok","Card copy ho gaya — Seetal ko paste kar do."); }
   catch(e){ prompt("Copy karo:", lastCard); }
 };
+
+/* startup par hi counter dikhao */
+paintSaved();
 </script>
 </body>
 </html>
