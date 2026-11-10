@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seetal Connector — ek-ek karke sab jodo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#1d2021; --bg2:#282828; --surface:#32302f; --surface2:#3c3836;
+  --border:rgba(235,219,178,.12); --border-strong:rgba(235,219,178,.24);
+  --text:#ebdbb2; --text-dim:#a89984;
+  --orange:#d65d0e; --orange-dim:rgba(214,93,14,.16);
+  --green:#98971a; --green-dim:rgba(152,151,26,.16);
+  --blue:#458588; --blue-dim:rgba(69,133,136,.16);
+  --yellow:#d79921; --yellow-dim:rgba(215,153,33,.16);
+  --red:#cc241d; --red-dim:rgba(204,36,29,.16);
+  --font-head:"Space Grotesk","Segoe UI",sans-serif;
+  --font-body:"Space Grotesk","Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:15px;line-height:1.5;
+  background-image:radial-gradient(800px 400px at 85% -10%, var(--orange-dim), transparent 60%),
+                   radial-gradient(600px 320px at 5% 0%, var(--blue-dim), transparent 60%);
+  background-repeat:no-repeat}
+.wrap{max-width:1240px;margin:0 auto;padding:0 20px 60px}
+
+/* header */
+header{padding:34px 0 20px;border-bottom:1px solid var(--border-strong);display:flex;gap:24px;flex-wrap:wrap;justify-content:space-between;align-items:flex-end}
+.brand{display:flex;align-items:center;gap:12px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px var(--green-dim)}
+h1{font-size:22px;margin:0;font-weight:700;letter-spacing:-.01em}
+.sub{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
+.progress{min-width:280px;flex:1 1 280px;max-width:420px}
+.bar{height:8px;border-radius:99px;background:var(--surface2);overflow:hidden;border:1px solid var(--border)}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--yellow));transition:width .4s ease}
+.plabel{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;color:var(--text-dim);margin-bottom:6px;letter-spacing:.05em}
+.plabel b{color:var(--text)}
+
+/* controls */
+.controls{position:sticky;top:0;z-index:40;padding:14px 0;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#q{flex:1 1 240px;min-width:0;padding:10px 13px;border-radius:8px;border:1px solid var(--border-strong);
+  background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;outline:none}
+#q:focus{border-color:var(--orange)}
+.btn{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.03em;padding:9px 13px;border-radius:8px;
+  border:1px solid var(--border-strong);background:var(--surface);color:var(--text-dim);cursor:pointer;transition:.15s;white-space:nowrap}
+.btn:hover{color:var(--text);border-color:var(--orange)}
+.btn.on{background:var(--orange);border-color:var(--orange);color:#1d2021;font-weight:600}
+.btn.primary{background:var(--green);border-color:var(--green);color:#1d2021;font-weight:600}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.chip{font-family:var(--font-mono);font-size:11px;padding:5px 10px;border-radius:99px;border:1px solid var(--border-strong);
+  background:var(--surface);color:var(--text-dim);cursor:pointer;transition:.15s}
+.chip:hover{border-color:var(--orange);color:var(--orange)}
+.chip.on{background:var(--blue);border-color:var(--blue);color:#1d2021;font-weight:600}
+
+/* layout */
+.main{display:grid;grid-template-columns:1fr 400px;gap:20px;margin-top:20px;align-items:start}
+@media (max-width:980px){.main{grid-template-columns:1fr}}
+
+/* system cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:9px}
+.sys{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--border-strong);border-radius:9px;
+  padding:11px 12px;cursor:pointer;transition:.15s;min-width:0}
+.sys:hover{background:var(--surface2);transform:translateY(-1px)}
+.sys.sel{border-color:var(--orange);border-left-color:var(--orange);background:var(--surface2)}
+.sys.done{border-left-color:var(--green);opacity:.75}
+.sys .n{font-weight:600;font-size:14px;overflow-wrap:anywhere}
+.sys .c{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
+.sys .r{display:inline-block;margin-top:7px;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.06em;
+  padding:2px 7px;border-radius:99px;text-transform:uppercase}
+.r-ready{background:var(--green-dim);color:var(--green)}
+.r-auth{background:var(--orange-dim);color:var(--orange)}
+.r-key{background:var(--blue-dim);color:var(--blue)}
+.r-free{background:var(--surface2);color:var(--text-dim)}
+.sys.done .r{background:var(--green);color:#1d2021}
+
+/* detail panel */
+.panel{position:sticky;top:96px;background:var(--surface);border:1px solid var(--border-strong);border-radius:12px;padding:18px}
+@media (max-width:980px){.panel{position:static}}
+.panel .empty{color:var(--text-dim);font-size:14px}
+.panel h2{margin:0;font-size:19px;font-weight:700;overflow-wrap:anywhere}
+.panel .meta{font-family:var(--font-mono);font-size:10.5px;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
+.panel a{color:var(--blue);font-family:var(--font-mono);font-size:12px;overflow-wrap:anywhere;text-decoration:none}
+.panel a:hover{text-decoration:underline}
+.panel ol{margin:14px 0 0;padding:0;list-style:none;counter-reset:s}
+.panel ol li{counter-increment:s;position:relative;padding-left:28px;margin-bottom:9px;font-size:13.5px;color:var(--text)}
+.panel ol li::before{content:counter(s);position:absolute;left:0;top:2px;width:19px;height:19px;border-radius:5px;background:var(--surface2);
+  border:1px solid var(--border-strong);color:var(--orange);font-family:var(--font-mono);font-size:10px;display:flex;align-items:center;justify-content:center}
+.panel code{font-family:var(--font-mono);font-size:12px;background:var(--surface2);border:1px solid var(--border);padding:1px 5px;border-radius:4px}
+.kya{margin-top:14px;padding:10px 12px;border-radius:8px;background:var(--green-dim);border:1px solid color-mix(in srgb,var(--green) 35%,transparent);font-size:13px}
+.kya b{color:var(--green)}
+.keybox{margin-top:14px}
+.keybox label{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);display:block;margin-bottom:5px}
+.keybox input{width:100%;padding:9px 11px;border-radius:7px;border:1px solid var(--border-strong);background:var(--bg2);
+  color:var(--text);font-family:var(--font-mono);font-size:12.5px;outline:none}
+.keybox input:focus{border-color:var(--green)}
+.keybox .hint{font-size:11.5px;color:var(--text-dim);margin-top:5px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px;padding-top:14px;border-top:1px dashed var(--border-strong)}
+.warn{margin-top:12px;font-size:12px;color:var(--text-dim);line-height:1.45}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--green);color:#1d2021;
+  font-family:var(--font-mono);font-size:12.5px;padding:10px 18px;border-radius:8px;opacity:0;pointer-events:none;transition:.25s;z-index:99}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+footer{margin-top:34px;padding-top:18px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-dim);max-width:76ch}
+footer b{color:var(--text)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <div class="brand"><span class="dot"></span><h1>Seetal Connector</h1></div>
+    <div class="sub">Agent shell &middot; ek-ek karke sab jodo &middot; offline</div>
+  </div>
+  <div class="progress">
+    <div class="plabel"><span>PROGRESS</span><span><b id="pcount">0</b> / <span id="ptotal">0</span> juda</span></div>
+    <div class="bar"><i id="pbar"></i></div>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="row">
+    <input id="q" type="search" placeholder="System dhoondo… (gemini, yahoo, mail, payment)" autocomplete="off">
+    <button class="btn" id="f-pending">Sirf baaki</button>
+    <button class="btn" id="f-done">Sirf jude hue</button>
+    <button class="btn" id="reset">Reset</button>
+  </div>
+  <div class="chips" id="chips"></div>
+</div>
+
+<div class="main">
+  <div>
+    <div class="grid" id="grid"></div>
+  </div>
+  <aside class="panel" id="panel">
+    <div class="empty">Koi system chuno — yahan uska step-by-step rasta dikhega.</div>
+  </aside>
+</div>
+
+<footer>
+  <b>Yeh agent kya karta hai:</b> tumhare connection ka poora hisaab rakhta hai — kaun juda, kaun baaki, kya step chahiye. Jo tumne "jod diya" mark kiya woh isi browser me save rehta hai. API key yahan sirf tumhare browser me rehti hai, kahin bhejti nahi — mujhe key dene ke liye "Seetal ko message" wala button dabao aur woh message mujhe chat me paste kar do. Rasta badalta rahega, list badalti rahegi — isi page ko update karte rehna hai.
+</footer>
+</div>
+
+<div class="toast" id="toast">Copy ho gaya</div>
+
+<script>
+// [name, url, kaam, category, route, keyUrl|null]
+const D = [
+["OpenAI","https://platform.openai.com","GPT models, embeddings, images","AI / LLM","key","https://platform.openai.com/api-keys"],
+["Anthropic Claude","https://console.anthropic.com","Claude models, coding, long context","AI / LLM","key","https://console.anthropic.com/settings/keys"],
+["Google Gemini","https://aistudio.google.com","Gemini models, vision, free tier","AI / LLM","key","https://aistudio.google.com/apikey"],
+["Sarvam AI","https://dashboard.sarvam.ai","Indic voice, translate, TTS","AI / LLM","key","https://dashboard.sarvam.ai"],
+["Mistral AI","https://console.mistral.ai","Open-weight models, EU hosted","AI / LLM","key","https://console.mistral.ai/api-keys"],
+["Groq","https://console.groq.com","Bahut tez inference","AI / LLM","key","https://console.groq.com/keys"],
+["Cohere","https://dashboard.cohere.com","Embeddings, rerank, RAG","AI / LLM","key","https://dashboard.cohere.com/api-keys"],
+["Together AI","https://api.together.xyz","100+ open models ek API par","AI / LLM","key","https://api.together.xyz/settings/api-keys"],
+["OpenRouter","https://openrouter.ai","Ek key, saare models","AI / LLM","key","https://openrouter.ai/keys"],
+["Hugging Face","https://huggingface.co","Models, datasets, free spaces","AI / LLM","key","https://huggingface.co/settings/tokens"],
+["Replicate","https://replicate.com","Model chalao, per-run payment","AI / LLM","key","https://replicate.com/account/api-tokens"],
+["Perplexity","https://www.perplexity.ai","Search + answer wala model","AI / LLM","key","https://www.perplexity.ai/settings/api"],
+["xAI Grok","https://console.x.ai","Grok models","AI / LLM","key","https://console.x.ai"],
+["DeepSeek","https://platform.deepseek.com","Sasta coding model","AI / LLM","key","https://platform.deepseek.com/api_keys"],
+["Ollama","https://ollama.com","Apne laptop par local model, free","AI / LLM","free",null],
+["ElevenLabs","https://elevenlabs.io","Natural voice, TTS","Voice / Audio","key","https://elevenlabs.io/app/settings/api-keys"],
+["Stability AI","https://platform.stability.ai","Image generation","AI / LLM","key","https://platform.stability.ai/account/keys"],
+["Fal.ai","https://fal.ai","Fast image + video generation","AI / LLM","key","https://fal.ai/dashboard/keys"],
+
+["Yahoo Finance","https://finance.yahoo.com","Free quotes — trader app isse chalta hai","Market Data","free",null],
+["Finage","https://finage.co.uk","Realtime stocks, forex, crypto","Market Data","ready",null],
+["Alpha Vantage","https://www.alphavantage.co","Free quotes + indicators","Market Data","key","https://www.alphavantage.co/support/#api-key"],
+["Finnhub","https://finnhub.io","News + quotes, free tier","Market Data","key","https://finnhub.io/register"],
+["Twelve Data","https://twelvedata.com","NSE/BSE + US bars","Market Data","key","https://twelvedata.com/pricing"],
+["Polygon.io","https://polygon.io","US realtime, websocket","Market Data","key","https://polygon.io/dashboard/api-keys"],
+["TradingView","https://www.tradingview.com","Charts aur widgets","Market Data","free",null],
+["NSE India","https://www.nseindia.com","Official NSE data","Market Data","free",null],
+["BSE India","https://www.bseindia.com","Official BSE data","Market Data","free",null],
+["Moneycontrol","https://www.moneycontrol.com","India news + prices","Market Data","free",null],
+["Stooq","https://stooq.com","Free CSV historical data","Market Data","free",null],
+["Tiingo","https://www.tiingo.com","Clean EOD + news API","Market Data","key","https://www.tiingo.com/account/api"],
+["EODHD","https://eodhd.com","Global EOD, fundamentals","Market Data","key","https://eodhd.com/cp/dashboard"],
+["Binance API","https://www.binance.com/en/binance-api","Crypto prices, free","Market Data","free",null],
+["CoinGecko","https://www.coingecko.com/en/api","Crypto data, free demo key","Market Data","free",null],
+["Zerodha Kite Connect","https://developers.kite.trade","Broker API, real orders","Trading","key","https://developers.kite.trade/apps"],
+["Angel One SmartAPI","https://smartapi.angelone.in","Free broker API + websocket","Trading","key","https://smartapi.angelone.in"],
+["Upstox API","https://upstox.com/developer/api-documentation","Broker API, free","Trading","key","https://account.upstox.com/developer/apps"],
+["Dhan API","https://dhan.co/api-trading","Broker API, free","Trading","key","https://web.dhan.co"],
+["Alpaca","https://alpaca.markets","US paper trading + data","Trading","key","https://app.alpaca.markets/paper/dashboard/overview"],
+
+["GitHub","https://github.com","Code, Actions, Pages, issues","Code / Deploy","ready",null],
+["GitLab","https://gitlab.com","Code + free Pages CI","Code / Deploy","free",null],
+["Bitbucket","https://bitbucket.org","Code hosting, Atlassian","Code / Deploy","free",null],
+["Codeberg","https://codeberg.org","Non-profit git hosting","Code / Deploy","free",null],
+["GitHub Pages","https://pages.github.com","Free static hosting","Hosting","ready",null],
+["Vercel","https://vercel.com","Free static + serverless","Hosting","free",null],
+["Netlify","https://www.netlify.com","Free static hosting + forms","Hosting","ready",null],
+["Cloudflare","https://dash.cloudflare.com","DNS, CDN, Pages, R2 storage","Hosting","auth",null],
+["Replit","https://replit.com","Browser me app banao aur publish karo","Hosting","ready",null],
+["Render","https://render.com","Free web services, auto deploy","Hosting","free",null],
+["Railway","https://railway.app","Deploy backend fast","Hosting","key","https://railway.app/account/tokens"],
+["Fly.io","https://fly.io","Small machines worldwide","Hosting","key","https://fly.io/user/personal_access_tokens"],
+["Heroku","https://www.heroku.com","Purana PaaS, ab paid","Hosting","key","https://dashboard.heroku.com/account"],
+["DigitalOcean","https://www.digitalocean.com","VPS + droplets","Hosting","key","https://cloud.digitalocean.com/account/api/tokens"],
+["AWS","https://aws.amazon.com","Sab kuch, free tier","Hosting","key","https://console.aws.amazon.com/iam"],
+["Google Cloud","https://cloud.google.com","GCP + free credits","Hosting","key","https://console.cloud.google.com/apis/credentials"],
+["Microsoft Azure","https://azure.microsoft.com","Azure + free tier","Hosting","key","https://portal.azure.com"],
+["Deno Deploy","https://deno.com/deploy","Edge JS hosting, free","Hosting","free",null],
+["Surge.sh","https://surge.sh","CLI se 1 minute me site","Hosting","free",null],
+["InfinityFree","https://infinityfree.com","Free PHP + MySQL hosting","Hosting","free",null],
+["Firebase","https://firebase.google.com","Hosting + DB + auth + push","Hosting","key","https://console.firebase.google.com"],
+["npm","https://www.npmjs.com","JS packages","Code / Deploy","free",null],
+["PyPI","https://pypi.org","Python packages","Code / Deploy","free",null],
+["Docker Hub","https://hub.docker.com","Image registry","Code / Deploy","free",null],
+["jsDelivr","https://www.jsdelivr.com","Free CDN, GitHub se file serve","Code / Deploy","free",null],
+
+["Supabase","https://supabase.com","Postgres + auth + storage + realtime","Database","ready",null],
+["MongoDB Atlas","https://www.mongodb.com/atlas","Free 512MB cloud DB","Database","key","https://cloud.mongodb.com"],
+["Neon Postgres","https://neon.tech","Serverless Postgres, free tier","Database","free",null],
+["PlanetScale","https://planetscale.com","MySQL, branching","Database","key","https://app.planetscale.com"],
+["Turso","https://turso.tech","Edge SQLite","Database","free",null],
+["Upstash Redis","https://upstash.com","Serverless Redis, free tier","Database","free",null],
+["Appwrite","https://appwrite.io","Self-host backend, open source","Database","free",null],
+["PocketBase","https://pocketbase.io","Ek file me poora backend","Database","free",null],
+["Airtable","https://airtable.com","Spreadsheet + API","Database","key","https://airtable.com/create/tokens"],
+["NocoDB","https://nocodb.com","Airtable ka open source version","Database","free",null],
+["Baserow","https://baserow.io","No-code database","Database","free",null],
+["Xata","https://xata.io","Postgres + search, free tier","Database","free",null],
+
+["n8n","https://n8n.io","Workflow automation, self-host free","Automation","free",null],
+["Zapier","https://zapier.com","Apps ko aapas me jodo","Automation","free",null],
+["Make","https://www.make.com","Visual automation, sasta","Automation","free",null],
+["Pabbly Connect","https://www.pabbly.com","Lifetime deal wala Zapier","Automation","key","https://accounts.pabbly.com"],
+["IFTTT","https://ifttt.com","Simple if-this-then-that","Automation","free",null],
+["GitHub Actions","https://github.com/features/actions","Free CI/cron — trader data isse banta hai","Automation","ready",null],
+["cron-job.org","https://cron-job.org","Free URL cron, 1 min tak","Automation","free",null],
+["Windmill","https://www.windmill.dev","Scripts ko workflow banao","Automation","free",null],
+["Activepieces","https://www.activepieces.com","Open source Zapier","Automation","free",null],
+
+["Gmail","https://mail.google.com","Mail padhna + draft banana","Communication","auth",null],
+["Slack","https://api.slack.com","Team messages + bots","Communication","key","https://api.slack.com/apps"],
+["Discord","https://discord.com/developers","Community bot, webhooks","Communication","ready",null],
+["Telegram Bot","https://core.telegram.org/bots","Sabse aasan bot, free","Communication","free",null],
+["WhatsApp Cloud API","https://developers.facebook.com/docs/whatsapp","Business messages","Communication","key","https://developers.facebook.com/apps"],
+["Twilio","https://www.twilio.com","SMS + voice call API","Communication","key","https://console.twilio.com"],
+["Resend","https://resend.com","Developer email, 3k free/month","Communication","key","https://resend.com/api-keys"],
+["SendGrid","https://sendgrid.com","Bulk email, free tier","Communication","key","https://app.sendgrid.com/settings/api_keys"],
+["Mailgun","https://www.mailgun.com","Email API","Communication","key","https://app.mailgun.com/settings/api_security"],
+["Brevo","https://www.brevo.com","Email + SMS, free 300/day","Communication","key","https://app.brevo.com"],
+["Pushover","https://pushover.net","Phone par push alert","Communication","key","https://pushover.net/api"],
+["ntfy","https://ntfy.sh","Free push, bina account","Communication","free",null],
+
+["Razorpay","https://razorpay.com","India payments + subscriptions","Payments","key","https://dashboard.razorpay.com/app/keys"],
+["Stripe","https://stripe.com","Global payments","Payments","key","https://dashboard.stripe.com/apikeys"],
+["Cashfree","https://www.cashfree.com","India payouts + gateway","Payments","key","https://merchant.cashfree.com"],
+["PayU","https://payu.in","India gateway","Payments","key","https://onboarding.payu.in"],
+["Instamojo","https://www.instamojo.com","Payment link, chhote business","Payments","key","https://www.instamojo.com"],
+["PayPal","https://developer.paypal.com","International payments","Payments","key","https://developer.paypal.com/dashboard/applications"],
+
+["Sentry","https://sentry.io","Errors pakdo, free tier","Monitoring","auth",null],
+["PostHog","https://posthog.com","Product analytics, self-host","Monitoring","free",null],
+["LogRocket","https://logrocket.com","Session replay","Monitoring","key","https://app.logrocket.com"],
+["Datadog","https://www.datadoghq.com","Infra monitoring","Monitoring","key","https://app.datadoghq.com"],
+["Grafana Cloud","https://grafana.com","Dashboards, free tier","Monitoring","free",null],
+["UptimeRobot","https://uptimerobot.com","Site down alert, free","Monitoring","free",null],
+["Better Stack","https://betterstack.com","Uptime + logs","Monitoring","free",null],
+
+["Cloudinary","https://cloudinary.com","Image/video upload + transform","Storage / Media","free",null],
+["ImageKit","https://imagekit.io","Image CDN, free tier","Storage / Media","free",null],
+["AWS S3","https://aws.amazon.com/s3","Object storage ka standard","Storage / Media","key","https://console.aws.amazon.com/iam"],
+["Backblaze B2","https://www.backblaze.com/cloud-storage","Cheap backup storage","Storage / Media","key","https://secure.backblaze.com/app_keys.htm"],
+["Uploadcare","https://uploadcare.com","File upload widget","Storage / Media","key","https://app.uploadcare.com"],
+
+["Figma","https://www.figma.com","UI design + dev handoff","Design / Docs","auth",null],
+["Canva","https://www.canva.com","Poster, thumbnail, video","Design / Docs","free",null],
+["Notion","https://www.notion.so","Notes + database + wiki","Design / Docs","free",null],
+["Google Workspace","https://workspace.google.com","Docs, Sheets, Drive API","Design / Docs","key","https://console.cloud.google.com/apis/credentials"],
+["Excalidraw","https://excalidraw.com","Hand-drawn diagram, free","Design / Docs","free",null],
+["Mermaid","https://mermaid.js.org","Code se diagram","Design / Docs","free",null],
+["Obsidian","https://obsidian.md","Local notes, plugin power","Design / Docs","free",null],
+
+["YouTube Data API","https://developers.google.com/youtube/v3","Video stats, upload, search","Social / YouTube","key","https://console.cloud.google.com/apis/credentials"],
+["YouTube Studio","https://studio.youtube.com","Channel manage karo","Social / YouTube","free",null],
+["Instagram Graph API","https://developers.facebook.com/docs/instagram-platform","Reels + insights","Social / YouTube","key","https://developers.facebook.com/apps"],
+["X API","https://developer.x.com","Tweets post + read","Social / YouTube","key","https://developer.x.com/en/portal/dashboard"],
+["LinkedIn API","https://developer.linkedin.com","Posts + profile","Social / YouTube","key","https://www.linkedin.com/developers/apps"],
+["Meta for Developers","https://developers.facebook.com","FB + IG + WhatsApp ek jagah","Social / YouTube","key","https://developers.facebook.com/apps"],
+
+["Brave Search API","https://brave.com/search/api/","Private web search, free tier","Search / Learn","key","https://api.search.brave.com/app/keys"],
+["SerpAPI","https://serpapi.com","Google results as JSON","Search / Learn","key","https://serpapi.com/manage-api-key"],
+["Tavily","https://tavily.com","AI agents ke liye search","Search / Learn","key","https://app.tavily.com"],
+["Google Programmable Search","https://programmablesearchengine.google.com","Apni site search","Search / Learn","key","https://programmablesearchengine.google.com/controlpanel/all"],
+["Wikipedia API","https://www.mediawiki.org/wiki/API:Main_page","Free knowledge, bina key","Search / Learn","free",null],
+["arXiv API","https://info.arxiv.org/help/api/index.html","Research papers","Search / Learn","free",null],
+["Kaggle","https://www.kaggle.com","Datasets + free GPU","Search / Learn","free",null],
+["Google Colab","https://colab.research.google.com","Free GPU notebook","Search / Learn","free",null],
+
+["OpenWeather","https://openweathermap.org/api","Mausam API, free tier","Utility","key","https://home.openweathermap.org/api_keys"],
+["Google Maps","https://developers.google.com/maps","Maps, routes, places","Utility","key","https://console.cloud.google.com/apis/credentials"],
+["OpenStreetMap","https://nominatim.openstreetmap.org","Free map + geocode","Utility","free",null],
+["IPinfo","https://ipinfo.io","IP lookup, free tier","Utility","key","https://ipinfo.io/account/token"],
+["QR Server","https://goqr.me/api/","QR code image banao","Utility","free",null],
+["HTML/CSS to Image","https://htmlcsstoimage.com","HTML se poster image","Utility","key","https://htmlcsstoimage.com/dashboard"],
+
+["DigiLocker","https://www.digilocker.gov.in","Documents digitally","India","free",null],
+["GST Portal","https://www.gst.gov.in","GST filing + verify","India","free",null],
+["NPCI / UPI","https://www.npci.org.in","UPI rails, payment infra","India","free",null],
+["AMFI","https://www.amfiindia.com","Mutual fund NAV data","India","free",null],
+["MF Central","https://www.mfcentral.com","Saare MF ek jagah","India","free",null],
+["NSDL","https://nsdl.co.in","Demat + PAN services","India","free",null],
+["RBI","https://www.rbi.org.in","Rates, circulars, data","India","free",null],
+["data.gov.in","https://data.gov.in","Government open datasets","India","free",null]
+];
+
+const RL = {ready:"juda hua", auth:"auth chahiye", key:"key chahiye", free:"bina key"};
+const STORE = "seetal-connector-v1";
+let state = {};
+try{ state = JSON.parse(localStorage.getItem(STORE) || "{}"); }catch(e){ state = {}; }
+const save = ()=>{ try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){} };
+
+const gridEl = document.getElementById("grid");
+const panelEl = document.getElementById("panel");
+const chipsEl = document.getElementById("chips");
+const qEl = document.getElementById("q");
+let cat = "All", filter = "all", sel = null;
+
+const CATS = ["All", ...Array.from(new Set(D.map(d=>d[3])))];
+document.getElementById("ptotal").textContent = D.length;
+
+CATS.forEach(c=>{
+  const b = document.createElement("button");
+  b.className = "chip" + (c==="All"?" on":"");
+  b.textContent = c;
+  b.onclick = ()=>{ cat=c; [...chipsEl.children].forEach(x=>x.classList.toggle("on",x===b)); render(); };
+  chipsEl.appendChild(b);
+});
+
+const esc = s => String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const isDone = n => !!(state[n] && state[n].done);
+const host = u => u.replace(/^https?:\/\//,"").replace(/\/$/,"");
+
+function progress(){
+  const done = D.filter(d=>isDone(d[0])).length;
+  document.getElementById("pcount").textContent = done;
+  document.getElementById("pbar").style.width = Math.round(done/D.length*100) + "%";
+}
+
+function render(){
+  const q = qEl.value.trim().toLowerCase();
+  const list = D.filter(d=>{
+    if(cat!=="All" && d[3]!==cat) return false;
+    if(filter==="pending" && isDone(d[0])) return false;
+    if(filter==="done" && !isDone(d[0])) return false;
+    if(q && !(d[0]+" "+d[2]+" "+d[3]+" "+d[4]).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  gridEl.innerHTML = list.map(d=>{
+    const done = isDone(d[0]);
+    const cls = "sys" + (done?" done":"") + (sel===d[0]?" sel":"");
+    return `<div class="${cls}" data-n="${esc(d[0])}">
+      <div class="n">${esc(d[0])}</div>
+      <div class="c">${esc(d[3])}</div>
+      <span class="r r-${d[4]}">${done?"juda":RL[d[4]]}</span>
+    </div>`;
+  }).join("") || `<div class="empty" style="color:var(--text-dim);padding:20px">Kuch nahi mila.</div>`;
+  [...gridEl.querySelectorAll(".sys")].forEach(el=>{
+    el.onclick = ()=>{ sel = el.dataset.n; render(); panel(el.dataset.n); };
+  });
+  progress();
+}
+
+function panel(name){
+  const d = D.find(x=>x[0]===name);
+  if(!d) return;
+  const [n,url,kaam,c,route,keyUrl] = d;
+  const done = isDone(n);
+  const savedKey = (state[n] && state[n].key) || "";
+  let steps = "";
+
+  if(route==="ready"){
+    steps = `<ol>
+      <li>Kuch karna hi nahi — yeh pehle se juda hua hai.</li>
+      <li>Chat me bas poochh lo: <code>${esc(n)} se yeh kaam karo</code></li>
+      <li>Main seedha kaam shuru kar dungi.</li></ol>`;
+  } else if(route==="auth"){
+    steps = `<ol>
+      <li>Chat me bolo: <code>${esc(n)} jodo</code></li>
+      <li>Main ek authorize link bhejungi — usme click karo.</li>
+      <li>${esc(n)} ke account se login karo (jo account chahiye wahi).</li>
+      <li>"Allow" dabao — password mujhe kabhi dena nahi hai.</li>
+      <li>Chat me wapas aakar batao "ho gaya" — main confirm karungi.</li></ol>`;
+  } else if(route==="key"){
+    steps = `<ol>
+      <li><a href="${esc(url)}" target="_blank" rel="noopener">${esc(host(url))}</a> kholo aur free account banao.</li>
+      <li>${keyUrl?`<a href="${esc(keyUrl)}" target="_blank" rel="noopener">API key wala page</a> kholo.`:`Dashboard me "API key" / "Settings" dhoondo.`}</li>
+      <li>"Create key" dabao, key copy karo (ek baar hi dikhti hai).</li>
+      <li>Neeche box me paste karo — sirf isi browser me save hogi.</li>
+      <li>Chat me mujhe bolo: <code>${esc(n)} ki key hai</code> — main test karke bataungi chalu hai ya nahi.</li></ol>`;
+  } else {
+    steps = `<ol>
+      <li>Koi key nahi chahiye — <a href="${esc(url)}" target="_blank" rel="noopener">${esc(host(url))}</a> khul jayega.</li>
+      <li>Chat me bolo kya chahiye: <code>${esc(n)} se yeh lao</code></li>
+      <li>Main page padh kar ya file laa kar jawab dungi.</li></ol>`;
+  }
+
+  const kya = {
+    ready:"Pehle se juda hua — iske liye kuch nahi karna.",
+    auth:"Allow dabate hi jud jayega — koi key nahi, koi code nahi.",
+    key:"Key milne par main isse seedha data la sakti hoon aur kaam kar sakti hoon.",
+    free:"Bina key bhi main iska public data padh kar jawab de sakti hoon."
+  }[route];
+
+  panelEl.innerHTML = `
+    <h2>${esc(n)}</h2>
+    <div class="meta">${esc(c)} &middot; ${RL[route]}</div>
+    <div style="margin-top:6px"><a href="${esc(url)}" target="_blank" rel="noopener">${esc(host(url))}</a></div>
+    <div style="color:var(--text-dim);font-size:13px;margin-top:6px">${esc(kaam)}</div>
+    ${steps}
+    ${route==="key"?`<div class="keybox">
+      <label>API key (sirf is browser me)</label>
+      <input id="keyin" type="password" placeholder="paste karo…" value="${esc(savedKey)}">
+      <div class="hint">Yeh kahin bhejti nahi — sirf tumhare browser me rehti hai. Mujhe dene ke liye neeche wala button dabao.</div>
+    </div>`:""}
+    <div class="kya"><b>Judne ke baad:</b> ${esc(kya)}</div>
+    <div class="actions">
+      <button class="btn primary" id="donebtn">${done?"Juda hua ✓ (undo)":"Jod diya ✓"}</button>
+      <button class="btn" id="copybtn">Seetal ko message</button>
+      ${keyUrl?`<a class="btn" style="text-decoration:none;display:inline-block" href="${esc(keyUrl)}" target="_blank" rel="noopener">Key page kholo</a>`:""}
+    </div>
+    <div class="warn">Key ko public repo, screenshot ya group me kabhi mat daalo. Test ke baad rotate kar dena achhi aadat hai.</div>
+  `;
+
+  document.getElementById("donebtn").onclick = ()=>{
+    state[n] = state[n] || {};
+    state[n].done = !state[n].done;
+    if(!state[n].done) delete state[n].done;
+    save(); render(); panel(n);
+    toast(state[n] && state[n].done ? n + " — juda mark kiya" : n + " — wapas baaki me");
+  };
+
+  document.getElementById("copybtn").onclick = async ()=>{
+    const keyEl = document.getElementById("keyin");
+    const key = keyEl ? keyEl.value.trim() : "";
+    if(keyEl){ state[n] = state[n] || {}; state[n].key = key; save(); }
+    let msg;
+    if(route==="auth") msg = `Seetal, ${n} jodo — authorize link bhejo.`;
+    else if(route==="key") msg = key
+      ? `Seetal, ${n} ki key hai — test karke batao chalu hai ya nahi. Key: ${key}`
+      : `Seetal, ${n} ki key banane ka rasta batao (free account se).`;
+    else if(route==="ready") msg = `Seetal, ${n} se kaam karna hai.`;
+    else msg = `Seetal, ${n} se data chahiye — bina key wala rasta batao.`;
+    try{ await navigator.clipboard.writeText(msg); toast("Copy ho gaya — chat me paste karo"); }
+    catch(e){ prompt("Copy karo:", msg); }
+  };
+}
+
+let tt;
+function toast(m){
+  const t = document.getElementById("toast");
+  t.textContent = m; t.classList.add("show");
+  clearTimeout(tt); tt = setTimeout(()=>t.classList.remove("show"), 1800);
+}
+
+document.getElementById("f-pending").onclick = e=>{
+  filter = filter==="pending" ? "all" : "pending";
+  document.getElementById("f-pending").classList.toggle("on", filter==="pending");
+  document.getElementById("f-done").classList.remove("on");
+  render();
+};
+document.getElementById("f-done").onclick = e=>{
+  filter = filter==="done" ? "all" : "done";
+  document.getElementById("f-done").classList.toggle("on", filter==="done");
+  document.getElementById("f-pending").classList.remove("on");
+  render();
+};
+document.getElementById("reset").onclick = ()=>{
+  if(!confirm("Progress aur saved keys mit jayengi. Pakka?")) return;
+  state = {}; save(); render();
+  panelEl.innerHTML = `<div class="empty">Koi system chuno — yahan uska step-by-step rasta dikhega.</div>`;
+  toast("Reset ho gaya");
+};
+qEl.addEventListener("input", render);
+render();
+</script>
+</body>
+</html>
