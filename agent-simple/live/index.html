@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Seetal Agent — v10 (khud check karta hai — saaf sach)</title>
+<title>Seetal Agent — v11 (bade tool bhi banata hai)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -91,7 +91,7 @@ textarea:focus{border-color:var(--blue)}
 </head>
 <body>
 <div class="wrap">
-  <h1>Seetal Agent <span style="font-size:13px;color:var(--dim);font-family:'Azeret Mono',monospace">v10</span></h1>
+  <h1>Seetal Agent <span style="font-size:13px;color:var(--dim);font-family:'Azeret Mono',monospace">v11</span></h1>
   <div class="sub">Bas ek jagah key daalni hai — neeche hari dashed line wale box me.</div>
 
   <div class="pointer">
@@ -136,7 +136,7 @@ textarea:focus{border-color:var(--blue)}
   <div class="out" id="out"></div>
 
   <div class="foot">
-    Keys isi browser me save hoti hain — naya version kholne par bhi bachi rehti hain. Purana version: <a href="../v9/">v9</a>, <a href="../v8/">v8</a>, <a href="../v7/">v7</a>.
+    Keys isi browser me save hoti hain — naya version kholne par bhi bachi rehti hain. Purana version: <a href="../v10/">v10</a>, <a href="../v9/">v9</a>, <a href="../v8/">v8</a>.
   </div>
 </div>
 
@@ -198,7 +198,10 @@ Sirf JSON me jawab do, koi extra text nahi:
 Ek baar me ek tool. Sirf diye gaye tools use karo. Data jhooth mat banao — tool fail ho to saaf bolo.
 Jawab Hinglish me, chhota aur seedha.
 7. Kaam bada ho to pehle chhote steps me todo, phir ek-ek tool chalao.
-8. App banana ho to make_app se poora chalta hua single-file HTML do — placeholder nahi, asli code.`;
+8. App banana ho to make_app se poora chalta hua single-file HTML do — placeholder nahi, asli code.
+9. Bada tool maanga jaye (video editor, 3D, dashboard, game) to "mumkin nahi" bol kar rukna mana hai.
+   Pehle batao browser me kya ho sakta hai, phir make_app se woh chalta hua version bana do.
+   Jo sach me browser me nahi hota (jaise text se nayi film banana — woh cloud AI ka kaam hai), sirf usi ko saaf mana karo.`;
 const TOOLS=[["time_now","{}","date/time"],["calc",'{"expr":"..."}',"ganit"],["wiki",'{"q":"..."}',"Wikipedia"],
  ["quote",'{"symbol":"..."}',"Yahoo price"],["crypto",'{"coin":"bitcoin"}',"crypto price"],
  ["http_get",'{"url":"https://..."}',"allowlist wale site se text"],
