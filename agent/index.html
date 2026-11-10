@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seetal Agent — multi-API agent core</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Azeret+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#002b36; --bg2:#073642; --surface:#0a3b47; --surface2:#0e4653;
+  --border:rgba(147,161,161,.16); --border-strong:rgba(147,161,161,.3);
+  --text:#eee8d5; --text-dim:#93a1a1;
+  --yellow:#b58900; --orange:#cb4b16; --red:#dc322f; --blue:#268bd2;
+  --cyan:#2aa198; --green:#859900; --violet:#6c71c4;
+  --font-head:"Manrope","Segoe UI",sans-serif;
+  --font-body:"Manrope","Segoe UI",sans-serif;
+  --font-mono:"Azeret Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:14.5px;line-height:1.5;
+  background-image:radial-gradient(700px 380px at 88% -12%, rgba(181,137,0,.12), transparent 62%),
+                   radial-gradient(600px 340px at 4% 0%, rgba(38,139,210,.12), transparent 60%);
+  background-repeat:no-repeat}
+.app{display:grid;grid-template-rows:auto 1fr;height:100vh}
+header{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;
+  padding:12px 18px;border-bottom:1px solid var(--border-strong);background:rgba(7,54,66,.7)}
+.brand{display:flex;align-items:center;gap:10px}
+.led{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(133,153,0,.16)}
+h1{font-size:16px;margin:0;font-weight:700;letter-spacing:-.01em}
+h1 span{color:var(--yellow)}
+.sub{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);letter-spacing:.1em;text-transform:uppercase}
+.pdots{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.pdot{font-family:var(--font-mono);font-size:10px;letter-spacing:.04em;padding:3px 8px;border-radius:99px;
+  border:1px solid var(--border-strong);color:var(--text-dim);display:flex;align-items:center;gap:5px}
+.pdot i{width:6px;height:6px;border-radius:50%;background:var(--text-dim);display:inline-block}
+.pdot.ok i{background:var(--green)} .pdot.ok{color:var(--green);border-color:rgba(133,153,0,.45)}
+.pdot.bad i{background:var(--red)} .pdot.bad{color:var(--red);border-color:rgba(220,50,47,.45)}
+.pdot.off{opacity:.55}
+
+main{display:grid;grid-template-columns:1fr 380px;min-height:0}
+@media (max-width:960px){main{grid-template-columns:1fr;grid-template-rows:1fr auto}}
+
+/* chat side */
+.chat{display:grid;grid-template-rows:1fr auto;min-height:0;border-right:1px solid var(--border-strong)}
+.stream{overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:92%;padding:10px 13px;border-radius:10px;font-size:14px;overflow-wrap:anywhere;white-space:pre-wrap}
+.msg.user{align-self:flex-end;background:rgba(38,139,210,.16);border:1px solid rgba(38,139,210,.35)}
+.msg.agent{align-self:flex-start;background:var(--surface);border:1px solid var(--border)}
+.msg.think{align-self:flex-start;background:transparent;border:1px dashed var(--border-strong);color:var(--text-dim);font-size:13px;font-style:italic}
+.msg.tool{align-self:stretch;max-width:100%;background:var(--bg2);border:1px solid var(--border);font-family:var(--font-mono);font-size:12px;color:var(--text-dim)}
+.msg.tool b{color:var(--cyan);font-weight:600}
+.msg.err{background:rgba(220,50,47,.14);border:1px solid rgba(220,50,47,.4);color:#f0c0bf;font-size:13px}
+.msg .who{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);display:block;margin-bottom:4px}
+.composer{border-top:1px solid var(--border-strong);padding:12px 14px;background:rgba(7,54,66,.6)}
+.crow{display:flex;gap:8px;align-items:flex-end}
+textarea#goal{flex:1;min-width:0;resize:none;height:56px;padding:10px 12px;border-radius:9px;border:1px solid var(--border-strong);
+  background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;outline:none}
+textarea#goal:focus{border-color:var(--yellow)}
+button{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.04em;padding:9px 14px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--border-strong);background:var(--surface);color:var(--text-dim);transition:.15s;white-space:nowrap}
+button:hover:not(:disabled){color:var(--text);border-color:var(--yellow)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.run{background:var(--green);border-color:var(--green);color:#002b36;font-weight:700}
+button.stop{background:var(--red);border-color:var(--red);color:#fff;font-weight:700}
+.hintline{font-family:var(--font-mono);font-size:10.5px;color:var(--text-dim);margin-top:8px;display:flex;gap:14px;flex-wrap:wrap}
+.hintline b{color:var(--yellow)}
+
+/* side */
+aside{overflow-y:auto;padding:16px;background:rgba(7,54,66,.45)}
+.block{margin-bottom:16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);overflow:hidden}
+.block > .bh{padding:9px 12px;background:var(--surface2);font-family:var(--font-mono);font-size:10.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--text-dim);display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.block > .bb{padding:12px;display:none}
+.block.open > .bb{display:block}
+.prov{border-top:1px solid var(--border);padding:10px 0}
+.prov:first-child{border-top:none;padding-top:0}
+.prov .top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.prov .nm{font-weight:600;font-size:13.5px}
+.prov input, .prov select, .block textarea{width:100%;padding:7px 9px;border-radius:6px;border:1px solid var(--border-strong);
+  background:var(--bg2);color:var(--text);font-family:var(--font-mono);font-size:11.5px;outline:none;margin-top:5px}
+.prov input:focus, .prov select:focus, .block textarea:focus{border-color:var(--cyan)}
+.mini{font-family:var(--font-mono);font-size:10px;padding:4px 8px;border-radius:6px}
+.status{font-family:var(--font-mono);font-size:10px;color:var(--text-dim)}
+.status.ok{color:var(--green)} .status.bad{color:var(--red)}
+#policy{min-height:150px;font-family:var(--font-body);font-size:12.5px;line-height:1.5;resize:vertical}
+#memlist{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);max-height:140px;overflow:auto}
+#memlist div{padding:3px 0;border-bottom:1px dashed var(--border)}
+.log{font-family:var(--font-mono);font-size:10.5px;color:var(--text-dim);max-height:180px;overflow:auto;line-height:1.6}
+.log b{color:var(--cyan)}
+footer.tiny{padding:10px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--text-dim);font-family:var(--font-mono)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <span class="led"></span>
+      <div>
+        <h1>Seetal <span>Agent</span></h1>
+        <div class="sub">multi-API core &middot; free tier only</div>
+      </div>
+    </div>
+    <div class="pdots" id="pdots"></div>
+  </header>
+
+  <main>
+    <section class="chat">
+      <div class="stream" id="stream">
+        <div class="msg agent"><span class="who">Seetal</span>Main taiyar hoon. Right side me koi ek free key daalo (Groq sabse aasan hai), phir neeche kaam likho — "NIFTY ka price nikaal ke note karo" jaisa. Main step-by-step khud tool chalaungi, tum dekh sakte ho.</div>
+      </div>
+      <div class="composer">
+        <div class="crow">
+          <textarea id="goal" placeholder="Kaam likho… jaise: Reliance aur TCS ka price lao, compare karo, note me save karo"></textarea>
+          <button class="run" id="run">Chalao</button>
+          <button class="stop" id="stop" disabled>Roko</button>
+        </div>
+        <div class="hintline">
+          <span>Model: <b id="activeModel">—</b></span>
+          <span>Steps: <b id="stepCount">0</b>/8</span>
+          <span>Tools: <b id="toolCount">0</b></span>
+        </div>
+      </div>
+    </section>
+
+    <aside>
+      <div class="block open" id="b-keys">
+        <div class="bh" data-toggle="b-keys"><span>Providers &amp; keys</span><span>▾</span></div>
+        <div class="bb" id="provbox"></div>
+      </div>
+
+      <div class="block" id="b-policy">
+        <div class="bh" data-toggle="b-policy"><span>Seetal ke niyam (policy)</span><span>▾</span></div>
+        <div class="bb">
+          <textarea id="policy" spellcheck="false"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="mini" id="savePolicy">Save</button>
+            <button class="mini" id="resetPolicy">Default</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="block" id="b-tools">
+        <div class="bh" data-toggle="b-tools"><span>Tools (jo agent chala sakta hai)</span><span>▾</span></div>
+        <div class="bb" id="toolbox"></div>
+      </div>
+
+      <div class="block" id="b-mem">
+        <div class="bh" data-toggle="b-mem"><span>Memory</span><span>▾</span></div>
+        <div class="bb">
+          <div id="memlist"></div>
+          <button class="mini" id="clearMem" style="margin-top:8px">Memory saaf karo</button>
+        </div>
+      </div>
+
+      <div class="block" id="b-log">
+        <div class="bh" data-toggle="b-log"><span>Run log</span><span>▾</span></div>
+        <div class="bb"><div class="log" id="log"></div></div>
+      </div>
+    </aside>
+  </main>
+  <footer class="tiny">Keys sirf isi browser me (localStorage) — kahin bhejti nahi. Agent sirf allowlist wale hosts se data laata hai.</footer>
+</div>
+
+<script>
+/* ---------- state ---------- */
+const LS = "seetal-agent-v2";
+const DEFAULT_POLICY = `Tum Seetal Agent ho — Swag ki madad karne wali chhoti agent.
+Rules:
+1. Sirf JSON me jawab do, koi extra text nahi:
+   {"thought":"chhota soch","tool":"tool_name","args":{...}}
+   ya kaam poora hone par: {"final":"Hinglish me saaf jawab"}
+2. Ek baar me ek tool. Result aane par agla step socho.
+3. Sirf diye gaye tools use karo. Naya tool invent mat karo.
+4. Data jhooth mat banao. Tool fail ho to saaf bolo.
+5. Paisa, order, delete — kuch bhi asli duniya me mat karvao. Sirf padho aur batao.
+6. Jawab Hinglish me, chhota aur seedha.`;
+
+const PROVIDERS = [
+  {id:"groq", name:"Groq", kind:"openai", base:"https://api.groq.com/openai/v1", model:"llama-3.3-70b-versatile", free:"free tier, sabse tez"},
+  {id:"gemini", name:"Google Gemini", kind:"gemini", base:"https://generativelanguage.googleapis.com/v1beta", model:"gemini-2.0-flash", free:"free tier, bada context"},
+  {id:"openrouter", name:"OpenRouter", kind:"openai", base:"https://openrouter.ai/api/v1", model:"meta-llama/llama-3.3-70b-instruct:free", free:"free models (:free)"},
+  {id:"cerebras", name:"Cerebras", kind:"openai", base:"https://api.cerebras.ai/v1", model:"llama-3.3-70b", free:"free tier"},
+  {id:"mistral", name:"Mistral", kind:"openai", base:"https://api.mistral.ai/v1", model:"mistral-small-latest", free:"free tier"}
+];
+
+const TOOLS = [
+  {name:"time_now", desc:"aaj ki date aur IST time", args:"{}"},
+  {name:"calc", desc:"ganit — expr jaise '(1324-1300)/1300*100'", args:'{"expr":"..."}'},
+  {name:"wiki", desc:"Wikipedia se chhota search", args:'{"q":"..."}'},
+  {name:"quote", desc:"Yahoo se price — symbol jaise RELIANCE.NS, ^NSEI, AAPL", args:'{"symbol":"..."}'},
+  {name:"fetch_text", desc:"allowlist wale URL se text laao", args:'{"url":"..."}'},
+  {name:"note_save", desc:"memory me note rakho", args:'{"key":"...","value":"..."}'},
+  {name:"note_get", desc:"memory se note padho", args:'{"key":"..."}'},
+  {name:"notes_list", desc:"saare notes ki list", args:"{}"},
+  {name:"copy", desc:"jawab clipboard me daalo", args:'{"text":"..."}'},
+  {name:"open_url", desc:"naya tab kholo (sirf allowlist)", args:'{"url":"..."}'}
+];
+
+const ALLOW_HOSTS = ["en.wikipedia.org","api.allorigins.win","query1.finance.yahoo.com","query2.finance.yahoo.com",
+  "raw.githubusercontent.com","api.github.com","data.gov.in","api.coingecko.com","www.rbi.org.in"];
+
+let state = {keys:{}, models:{}, policy:DEFAULT_POLICY, notes:{}, health:{}};
+try{ Object.assign(state, JSON.parse(localStorage.getItem(LS)||"{}")); }catch(e){}
+if(!state.keys) state.keys={}; if(!state.models) state.models={}; if(!state.notes) state.notes={};
+if(!state.policy) state.policy = DEFAULT_POLICY;
+const save = ()=>{ try{ localStorage.setItem(LS, JSON.stringify(state)); }catch(e){} };
+
+let running = false, abortFlag = false, stepNo = 0, toolNo = 0;
+const streamEl = document.getElementById("stream");
+const logEl = document.getElementById("log");
+
+/* ---------- ui helpers ---------- */
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function bubble(cls, who, text){
+  const d = document.createElement("div");
+  d.className = "msg " + cls;
+  d.innerHTML = (who?`<span class="who">${esc(who)}</span>`:"") + esc(text);
+  streamEl.appendChild(d); streamEl.scrollTop = streamEl.scrollHeight;
+  return d;
+}
+function logline(t){ logEl.innerHTML += t + "<br>"; logEl.scrollTop = logEl.scrollHeight; }
+document.querySelectorAll("[data-toggle]").forEach(h=>{
+  h.onclick = ()=> document.getElementById(h.dataset.toggle).classList.toggle("open");
+});
+
+/* ---------- providers panel ---------- */
+const provBox = document.getElementById("provbox");
+PROVIDERS.forEach(p=>{
+  const wrap = document.createElement("div");
+  wrap.className = "prov";
+  wrap.innerHTML = `
+    <div class="top">
+      <span class="nm">${esc(p.name)}</span>
+      <span class="status" id="st-${p.id}">—</span>
+    </div>
+    <div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono)">${esc(p.free)}</div>
+    <input id="key-${p.id}" type="password" placeholder="API key paste karo…" value="${esc(state.keys[p.id]||"")}">
+    <input id="mod-${p.id}" placeholder="model" value="${esc(state.models[p.id]||p.model)}">
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <button class="mini" data-test="${p.id}">Test</button>
+      <button class="mini" data-models="${p.id}">Models laao</button>
+    </div>`;
+  provBox.appendChild(wrap);
+  wrap.querySelector("#key-"+p.id).onchange = e=>{ state.keys[p.id]=e.target.value.trim(); save(); paintDots(); };
+  wrap.querySelector("#mod-"+p.id).onchange = e=>{ state.models[p.id]=e.target.value.trim(); save(); };
+  wrap.querySelector(`[data-test="${p.id}"]`).onclick = ()=> testProvider(p);
+  wrap.querySelector(`[data-models="${p.id}"]`).onclick = ()=> listModels(p);
+});
+
+function paintDots(){
+  const box = document.getElementById("pdots");
+  box.innerHTML = PROVIDERS.map(p=>{
+    const has = !!state.keys[p.id];
+    const h = state.health[p.id];
+    const cls = !has ? "off" : (h==="ok" ? "ok" : h==="bad" ? "bad" : "");
+    return `<span class="pdot ${cls}"><i></i>${esc(p.name)}</span>`;
+  }).join("");
+}
+paintDots();
+
+/* ---------- provider calls ---------- */
+function providerById(id){ return PROVIDERS.find(p=>p.id===id); }
+function usable(){
+  return PROVIDERS.filter(p=>state.keys[p.id]);
+}
+
+async function callModel(systemPrompt, messages){
+  const list = usable();
+  if(!list.length) throw new Error("Koi provider key nahi hai — right side me ek key daalo (Groq sabse aasan).");
+  let lastErr = null;
+  for(const p of list){
+    try{
+      const model = state.models[p.id] || p.model;
+      const text = p.kind==="gemini"
+        ? await geminiCall(p, model, systemPrompt, messages)
+        : await openaiCall(p, model, systemPrompt, messages);
+      state.health[p.id]="ok"; save(); paintDots();
+      document.getElementById("activeModel").textContent = p.name + " · " + model;
+      document.getElementById(`st-${p.id}`).textContent = "chalu"; document.getElementById(`st-${p.id}`).className="status ok";
+      return text;
+    }catch(err){
+      lastErr = err;
+      state.health[p.id]="bad"; save(); paintDots();
+      const el = document.getElementById(`st-${p.id}`);
+      if(el){ el.textContent = "fail"; el.className="status bad"; }
+      logline(`<b>${esc(p.id)}</b> fail → ${esc(err.message)} — agla provider try`);
+    }
+  }
+  throw lastErr || new Error("saare provider fail");
+}
+
+async function openaiCall(p, model, systemPrompt, messages){
+  const r = await fetch(p.base + "/chat/completions", {
+    method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":"Bearer "+state.keys[p.id]},
+    body: JSON.stringify({
+      model, temperature:0.3, max_tokens:800,
+      messages:[{role:"system",content:systemPrompt}, ...messages]
+    })
+  });
+  if(!r.ok) throw new Error("HTTP "+r.status+" "+(await r.text()).slice(0,160));
+  const j = await r.json();
+  return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || "";
+}
+
+async function geminiCall(p, model, systemPrompt, messages){
+  const contents = messages.map(m=>({role: m.role==="assistant"?"model":"user", parts:[{text:m.content}]}));
+  const r = await fetch(`${p.base}/models/${encodeURIComponent(model)}:generateContent`, {
+    method:"POST",
+    headers:{"Content-Type":"application/json","x-goog-api-key":state.keys[p.id]},
+    body: JSON.stringify({
+      systemInstruction:{parts:[{text:systemPrompt}]},
+      contents,
+      generationConfig:{temperature:0.3, maxOutputTokens:800}
+    })
+  });
+  if(!r.ok) throw new Error("HTTP "+r.status+" "+(await r.text()).slice(0,160));
+  const j = await r.json();
+  const c = j.candidates && j.candidates[0];
+  return (c && c.content && c.content.parts || []).map(x=>x.text||"").join("");
+}
+
+async function testProvider(p){
+  const el = document.getElementById(`st-${p.id}`);
+  if(!state.keys[p.id]){ el.textContent="key nahi"; el.className="status bad"; return; }
+  el.textContent="test…"; el.className="status";
+  try{
+    const out = await (p.kind==="gemini"
+      ? geminiCall(p, state.models[p.id]||p.model, "Reply with OK only.", [{role:"user",content:"ping"}])
+      : openaiCall(p, state.models[p.id]||p.model, "Reply with OK only.", [{role:"user",content:"ping"}]));
+    el.textContent = "chalu ✓"; el.className="status ok";
+    state.health[p.id]="ok"; save(); paintDots();
+    logline(`<b>${esc(p.id)}</b> test ok → ${esc(String(out).slice(0,60))}`);
+  }catch(e){
+    el.textContent = "fail"; el.className="status bad";
+    state.health[p.id]="bad"; save(); paintDots();
+    logline(`<b>${esc(p.id)}</b> test fail → ${esc(e.message)}`);
+  }
+}
+
+async function listModels(p){
+  try{
+    let names = [];
+    if(p.kind==="gemini"){
+      const r = await fetch(p.base+"/models", {headers:{"x-goog-api-key":state.keys[p.id]}});
+      const j = await r.json();
+      names = (j.models||[]).map(m=>String(m.name).replace(/^models\//,""));
+    }else{
+      const r = await fetch(p.base+"/models", {headers:{"Authorization":"Bearer "+state.keys[p.id]}});
+      const j = await r.json();
+      names = (j.data||[]).map(m=>m.id);
+    }
+    if(!names.length) throw new Error("list khaali aayi");
+    const pick = prompt("Model chuno:\n\n" + names.slice(0,40).join("\n"), state.models[p.id] || names[0]);
+    if(pick){ state.models[p.id]=pick.trim(); save(); document.getElementById("mod-"+p.id).value=pick.trim(); }
+    logline(`<b>${esc(p.id)}</b> ${names.length} models mile`);
+  }catch(e){ logline(`<b>${esc(p.id)}</b> models fail → ${esc(e.message)}`); alert("Models list nahi aayi: "+e.message); }
+}
+
+/* ---------- tools ---------- */
+const toolBox = document.getElementById("toolbox");
+toolBox.innerHTML = TOOLS.map(t=>`<div style="padding:5px 0;border-bottom:1px dashed var(--border)">
+  <span style="font-family:var(--font-mono);font-size:11.5px;color:var(--cyan)">${esc(t.name)}</span>
+  <div style="font-size:11.5px;color:var(--text-dim)">${esc(t.desc)}</div></div>`).join("");
+
+function hostOk(u){
+  try{ const h = new URL(u).hostname; return ALLOW_HOSTS.some(a=> h===a || h.endsWith("."+a)); }
+  catch(e){ return false; }
+}
+const proxy = u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u);
+
+async function runTool(name, args){
+  args = args || {};
+  switch(name){
+    case "time_now": {
+      const now = new Date();
+      return { iso: now.toISOString(), ist: now.toLocaleString("en-IN",{timeZone:"Asia/Kolkata"}), day: now.toLocaleDateString("en-IN",{weekday:"long",timeZone:"Asia/Kolkata"}) };
+    }
+    case "calc": {
+      const e = String(args.expr||"").replace(/[^0-9+\-*/%.() ]/g,"");
+      if(!e) throw new Error("expr khaali");
+      const v = Function('"use strict";return ('+e+')')();
+      if(typeof v !== "number" || !isFinite(v)) throw new Error("number nahi bana");
+      return { expr:e, value:v };
+    }
+    case "wiki": {
+      const q = encodeURIComponent(String(args.q||""));
+      const r = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${q}&format=json&origin=*&srlimit=3`);
+      const j = await r.json();
+      const hits = (j.query&&j.query.search||[]).map(s=>({title:s.title, snippet:String(s.snippet).replace(/<[^>]+>/g,"")}));
+      if(!hits.length) throw new Error("kuch nahi mila");
+      return hits;
+    }
+    case "quote": {
+      const s = String(args.symbol||"").trim();
+      if(!s) throw new Error("symbol khaali");
+      const u = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?range=1d&interval=5m`;
+      const r = await fetch(proxy(u));
+      const j = await r.json();
+      const m = j.chart && j.chart.result && j.chart.result[0];
+      if(!m) throw new Error("Yahoo se data nahi aaya");
+      const meta = m.meta || {};
+      return { symbol:s, price:meta.regularMarketPrice, prev:meta.chartPreviousClose || meta.previousClose, currency:meta.currency, time:meta.regularMarketTime };
+    }
+    case "fetch_text": {
+      const u = String(args.url||"");
+      if(!hostOk(u)) throw new Error("yeh host allowlist me nahi hai: " + u);
+      const r = await fetch(proxy(u));
+      const t = await r.text();
+      return { url:u, chars:t.length, text:t.slice(0,2000) };
+    }
+    case "note_save": {
+      const k = String(args.key||"").slice(0,60), v = String(args.value||"").slice(0,2000);
+      if(!k) throw new Error("key khaali");
+      state.notes[k] = {v, at:new Date().toISOString()}; save(); paintMem();
+      return { saved:k };
+    }
+    case "note_get": {
+      const n = state.notes[String(args.key||"")];
+      if(!n) throw new Error("aisa note nahi hai");
+      return n;
+    }
+    case "notes_list": return Object.keys(state.notes).map(k=>({key:k, value:String(state.notes[k].v).slice(0,120)}));
+    case "copy": { await navigator.clipboard.writeText(String(args.text||"")); return {copied:true}; }
+    case "open_url": {
+      const u = String(args.url||"");
+      if(!hostOk(u)) throw new Error("yeh host allowlist me nahi hai");
+      window.open(u,"_blank","noopener"); return {opened:u};
+    }
+    default: throw new Error("aisa tool nahi hai: " + name);
+  }
+}
+
+/* ---------- memory ---------- */
+function paintMem(){
+  const el = document.getElementById("memlist");
+  const ks = Object.keys(state.notes);
+  el.innerHTML = ks.length ? ks.map(k=>`<div><b style="color:var(--cyan)">${esc(k)}</b> — ${esc(String(state.notes[k].v).slice(0,70))}</div>`).join("")
+                           : '<div style="opacity:.6">khaali</div>';
+}
+paintMem();
+document.getElementById("clearMem").onclick = ()=>{
+  if(!confirm("Poori memory mit jayegi. Pakka?")) return;
+  state.notes = {}; save(); paintMem(); logline("memory saaf ki");
+};
+
+/* ---------- policy ---------- */
+const polEl = document.getElementById("policy");
+polEl.value = state.policy;
+document.getElementById("savePolicy").onclick = ()=>{ state.policy = polEl.value; save(); logline("policy save hui"); };
+document.getElementById("resetPolicy").onclick = ()=>{ polEl.value = DEFAULT_POLICY; state.policy = DEFAULT_POLICY; save(); logline("policy default par"); };
+
+/* ---------- agent loop ---------- */
+function parseJSON(text){
+  let t = String(text||"").trim();
+  t = t.replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+  const a = t.indexOf("{"), b = t.lastIndexOf("}");
+  if(a>=0 && b>a) t = t.slice(a,b+1);
+  return JSON.parse(t);
+}
+
+async function runAgent(goal){
+  running = true; abortFlag = false; stepNo = 0; toolNo = 0;
+  document.getElementById("run").disabled = true;
+  document.getElementById("stop").disabled = false;
+  document.getElementById("stepCount").textContent = "0";
+  document.getElementById("toolCount").textContent = "0";
+  bubble("user","Swag",goal);
+  logline("— run shuru —");
+
+  const messages = [{role:"user", content:
+    "Kaam: " + goal + "\n\nTools: " + TOOLS.map(t=>t.name+"("+t.args+")").join(", ") +
+    "\n\nSirf JSON me jawab do."}];
+
+  const MAX = 8;
+  for(let i=0;i<MAX && !abortFlag;i++){
+    stepNo = i+1;
+    document.getElementById("stepCount").textContent = stepNo;
+    let raw;
+    try{ raw = await callModel(state.policy, messages); }
+    catch(e){ bubble("err","Error", e.message); running=false; break; }
+
+    let obj;
+    try{ obj = parseJSON(raw); }
+    catch(e){
+      bubble("agent","Seetal", raw.trim());
+      messages.push({role:"assistant", content:raw});
+      messages.push({role:"user", content:"Sirf JSON do — {\"final\":\"...\"} ya {\"thought\":\"...\",\"tool\":\"...\",\"args\":{...}}"});
+      continue;
+    }
+
+    if(obj.final){
+      bubble("agent","Seetal", obj.final);
+      logline("— kaam poora —");
+      break;
+    }
+
+    if(obj.thought) bubble("think","soch", obj.thought);
+    if(!obj.tool){
+      messages.push({role:"assistant", content:raw});
+      messages.push({role:"user", content:"tool ya final do — JSON me."});
+      continue;
+    }
+
+    toolNo++;
+    document.getElementById("toolCount").textContent = toolNo;
+    const tb = bubble("tool","", `▶ ${obj.tool}  ${JSON.stringify(obj.args||{})}`);
+    let result, ok = true;
+    try{ result = await runTool(obj.tool, obj.args); }
+    catch(e){ ok = false; result = {error:e.message}; }
+    tb.innerHTML += `\n<span style="color:${ok?"var(--green)":"var(--red)"}">${ok?"✓":"✗"} ${esc(JSON.stringify(result).slice(0,400))}</span>`;
+    streamEl.scrollTop = streamEl.scrollHeight;
+    logline(`step ${stepNo}: <b>${esc(obj.tool)}</b> ${ok?"ok":"fail"}`);
+
+    messages.push({role:"assistant", content:raw});
+    messages.push({role:"user", content:"TOOL RESULT (" + obj.tool + "): " + JSON.stringify(result).slice(0,1800) + "\n\nAgla step JSON me."});
+  }
+  if(abortFlag) bubble("err","Rok diya","Tumne roka — kaam beech me ruk gaya.");
+  if(stepNo>=8) bubble("err","Limit","8 step poore ho gaye. Kaam chhota karke dobara bolo.");
+  running = false;
+  document.getElementById("run").disabled = false;
+  document.getElementById("stop").disabled = true;
+}
+
+document.getElementById("run").onclick = ()=>{
+  const g = document.getElementById("goal").value.trim();
+  if(!g) return;
+  if(running) return;
+  runAgent(g);
+};
+document.getElementById("stop").onclick = ()=>{ abortFlag = true; logline("stop dabaya"); };
+document.getElementById("goal").addEventListener("keydown", e=>{
+  if((e.ctrlKey||e.metaKey) && e.key==="Enter"){ e.preventDefault(); document.getElementById("run").click(); }
+});
+</script>
+</body>
+</html>
