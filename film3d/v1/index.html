@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seetal 3D Film — free models</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--line:#30363d;--text:#e6edf3;--dim:#8b949e;
+ --green:#3fb950;--green-bg:#12261a;--red:#f85149;--blue:#58a6ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;font-size:15px;line-height:1.5}
+.wrap{max-width:720px;margin:0 auto;padding:16px 16px 60px}
+h1{font-size:21px;margin:0 0 2px;font-weight:800}
+.sub{color:var(--dim);font-size:13.5px;margin-bottom:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+label{font-family:"Azeret Mono",monospace;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:6px}
+input,select,textarea{width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-family:inherit;font-size:14.5px}
+textarea{min-height:62px;resize:vertical}
+button{font-family:inherit;font-size:14px;font-weight:700;padding:12px 16px;border-radius:10px;border:none;background:var(--surface2);color:var(--text);cursor:pointer}
+button:hover:not(:disabled){background:var(--line)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.go{background:var(--green);color:#04170a;width:100%;margin-top:10px}
+.stage{background:#000;border-radius:12px;overflow:hidden;aspect-ratio:9/16;max-height:56vh;margin:0 auto;position:relative}
+canvas{width:100%;height:100%;display:block}
+#gl{position:absolute;left:-9999px;top:-9999px}
+.msg{margin-top:10px;padding:10px 12px;border-radius:9px;font-size:13.5px;display:none;white-space:pre-wrap}
+.msg.show{display:block}
+.msg.ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green)}
+.msg.bad{background:#2a1414;color:var(--red);border:1px solid var(--red)}
+.msg.info{background:var(--surface2);color:var(--dim);border:1px dashed var(--line)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.row button{flex:1;min-width:120px}
+.shots{margin-top:10px;font-size:12.5px;color:var(--dim);max-height:110px;overflow:auto}
+.shots div{padding:5px 0;border-bottom:1px dashed var(--line)}
+.foot{color:var(--dim);font-size:12.5px;margin-top:14px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Seetal 3D Film <span style="font-size:12px;color:var(--dim);font-family:'Azeret Mono',monospace">free models</span></h1>
+  <div class="sub">Asli 3D character chalte hain — free models (Khronos/three.js) + Three.js. Koi paid API nahi.</div>
+
+  <div class="card">
+    <label>Kahani</label>
+    <textarea id="topic">Ek ladka jungle se darta hai. Aage jaakar use ek gufa milti hai. Wahan ek ladki milti hai. Woh usse bachata hai aur dosti ho jaati hai.</textarea>
+    <div class="row">
+      <div style="flex:1;min-width:100px"><label>Shots</label>
+        <select id="nshots"><option>3</option><option selected>4</option><option>5</option></select></div>
+      <div style="flex:1;min-width:100px"><label>Har shot</label>
+        <select id="secs"><option value="4000">4 sec</option><option value="5000" selected>5 sec</option><option value="6000">6 sec</option></select></div>
+    </div>
+    <button class="go" id="make">1. Scene plan banao</button>
+    <div class="msg" id="msg1"></div>
+    <div class="shots" id="shots"></div>
+  </div>
+
+  <div class="card">
+    <div class="stage"><canvas id="stage" width="720" height="1280"></canvas><canvas id="gl" width="720" height="1280"></canvas></div>
+    <div class="row">
+      <button id="play">2. Film chalao</button>
+      <button id="rec">3. Record + download</button>
+    </div>
+    <div class="msg" id="msg2"></div>
+  </div>
+
+  <div class="foot">
+    3D models free hain: Soldier aur Xbot (three.js examples), Fox (Khronos glTF samples) — sab GitHub se seedha load hote hain. Character chalte hain, camera move karta hai, scene banta hai (jungle, gufa, nadi). Awaaz phone ki TTS.
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+const KSTORE="seetal-keys-v1";
+const GROQ={base:"https://api.groq.com/openai/v1", model:"qwen/qwen3.8-27b"};
+const stage=document.getElementById("stage"), ctx=stage.getContext("2d");
+const msg1=document.getElementById("msg1"), msg2=document.getElementById("msg2");
+const W=stage.width, H=stage.height;
+
+const MODELS={
+  human:"https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Soldier.glb",
+  robot:"https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Xbot.glb",
+  fox:"https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Fox/glTF-Binary/Fox.glb"
+};
+
+let renderer, scene, camera, clock, mixer=null, actor=null, world=[];
+let shots=[], running=false, recorder=null, chunks=[], blobUrl=null;
+const cache={};
+
+function show(el,cls,txt){ el.className="msg show "+cls; el.textContent=txt; }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function key(){ try{ const s=JSON.parse(localStorage.getItem(KSTORE)||"{}"); return (s.keys&&(s.keys.groq||s.keys.openrouter))||""; }catch(e){ return ""; } }
+function parseJSON(t){
+  t=String(t||"").trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+  const a=t.indexOf("{"), b=t.lastIndexOf("}");
+  if(a>=0&&b>a) t=t.slice(a,b+1);
+  return JSON.parse(t);
+}
+
+/* ---------- 3D setup ---------- */
+function init3D(){
+  if(renderer) return;
+  if(typeof THREE==="undefined"){ show(msg2,"bad","three.js load nahi hua — internet ya ad-blocker check karo, phir page refresh karo."); throw new Error("THREE missing"); }
+  renderer=new THREE.WebGLRenderer({canvas:document.getElementById("gl"),antialias:true,preserveDrawingBuffer:true});
+  renderer.setSize(W,H,false);
+  renderer.setPixelRatio(1);
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(48, W/H, 0.1, 300);
+  camera.position.set(0,3.2,9);
+  camera.lookAt(0,1.2,0);
+  clock=new THREE.Clock();
+  scene.add(new THREE.HemisphereLight(0xffffff,0x334455,1.0));
+  const d=new THREE.DirectionalLight(0xffffff,0.9); d.position.set(5,10,7); scene.add(d);
+}
+
+function clearWorld(){
+  world.forEach(o=>{ scene.remove(o); if(o.geometry) o.geometry.dispose(); });
+  world=[];
+  if(actor){ scene.remove(actor); actor=null; }
+  mixer=null;
+}
+
+function ground(color){
+  const g=new THREE.Mesh(new THREE.PlaneGeometry(200,200), new THREE.MeshLambertMaterial({color}));
+  g.rotation.x=-Math.PI/2; g.position.y=0; scene.add(g); world.push(g);
+}
+function tree(x,z,h){
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.22,h*0.5,6), new THREE.MeshLambertMaterial({color:0x6b4a2f}));
+  trunk.position.set(x,h*0.25,z); scene.add(trunk); world.push(trunk);
+  const top=new THREE.Mesh(new THREE.ConeGeometry(h*0.42,h*0.9,7), new THREE.MeshLambertMaterial({color:0x2e7d32}));
+  top.position.set(x,h*0.5+h*0.42,z); scene.add(top); world.push(top);
+}
+function rock(x,z,s){
+  const r=new THREE.Mesh(new THREE.DodecahedronGeometry(s,0), new THREE.MeshLambertMaterial({color:0x555b66}));
+  r.position.set(x,s*0.5,z); scene.add(r); world.push(r);
+}
+function cave(){
+  const mat=new THREE.MeshLambertMaterial({color:0x2a2a33});
+  const l=new THREE.Mesh(new THREE.BoxGeometry(1.6,5,2),mat); l.position.set(-2.2,2.5,-2); scene.add(l); world.push(l);
+  const r=new THREE.Mesh(new THREE.BoxGeometry(1.6,5,2),mat); r.position.set(2.2,2.5,-2); scene.add(r); world.push(r);
+  const top=new THREE.Mesh(new THREE.BoxGeometry(6,1.6,2),mat); top.position.set(0,5.4,-2); scene.add(top); world.push(top);
+  const glow=new THREE.PointLight(0xffcc77,1.2,12); glow.position.set(0,1.6,-1.4); scene.add(glow); world.push(glow);
+}
+
+function buildScene(kind){
+  clearWorld();
+  const fog=new THREE.Fog(0x000000, 12, 42);
+  if(kind==="cave"){ scene.background=new THREE.Color(0x14161c); scene.fog=new THREE.Fog(0x14161c,8,34); ground(0x3a3a44); cave(); rock(-4,1,1.2); rock(4.5,-1,1.5); }
+  else if(kind==="river"){ scene.background=new THREE.Color(0x9fd8ef); scene.fog=new THREE.Fog(0x9fd8ef,20,70); ground(0x1f7a8c); for(let i=0;i<7;i++) tree(-9+i*3,-6-Math.random()*4,2.4+Math.random()); }
+  else if(kind==="village"){ scene.background=new THREE.Color(0xffcf9e); scene.fog=new THREE.Fog(0xffcf9e,20,70); ground(0x8d6e63); for(let i=0;i<5;i++) tree(-8+i*4,-7,3); }
+  else if(kind==="night"){ scene.background=new THREE.Color(0x0b1030); scene.fog=new THREE.Fog(0x0b1030,10,40); ground(0x22304a); for(let i=0;i<6;i++) tree(-9+i*3.4,-7,2.6); }
+  else { scene.background=new THREE.Color(0x9ed8f0); scene.fog=new THREE.Fog(0x9ed8f0,18,65); ground(0x2f7d32);
+    for(let i=0;i<8;i++) tree(-11+i*3.1,-6-Math.random()*5,2.6+Math.random()*1.4);
+    for(let i=0;i<4;i++) rock(-6+i*4, 2+Math.random()*3, 0.5+Math.random()*0.5);
+  }
+}
+
+function loadModel(url){
+  return new Promise((res,rej)=>{
+    if(cache[url]) return res(cache[url]);
+    new THREE.GLTFLoader().load(url, g=>{ cache[url]=g; res(g); }, undefined, e=>rej(e));
+  });
+}
+function pickClip(clips, want){
+  const re=new RegExp(want,"i");
+  return clips.find(c=>re.test(c.name)) || clips[0];
+}
+function simpleActor(kind){
+  const grp=new THREE.Group();
+  const col = kind==="robot"?0x8899aa : kind==="fox"?0xb5651d : 0x3366cc;
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry?new THREE.CapsuleGeometry(0.32,0.9,4,8):new THREE.CylinderGeometry(0.32,0.32,1.5,8),
+    new THREE.MeshLambertMaterial({color:col}));
+  body.position.y=0.95; grp.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.28,16,12), new THREE.MeshLambertMaterial({color:0xf2c9a0}));
+  head.position.y=1.75; grp.add(head);
+  grp.position.set(-4,0,0);
+  scene.add(grp); actor=grp; mixer=null;
+  return grp;
+}
+
+async function addActor(kind){
+  const url = kind==="robot"?MODELS.robot : kind==="fox"?MODELS.fox : MODELS.human;
+  let g;
+  try{ g=await loadModel(url); }catch(e){ return simpleActor(kind); }
+  const root=g.scene.clone(true);
+  root.traverse(o=>{ if(o.isMesh){ o.castShadow=false; o.frustumCulled=false; } });
+  const box=new THREE.Box3().setFromObject(root);
+  const size=new THREE.Vector3(); box.getSize(size);
+  const s = kind==="fox" ? 1.6/Math.max(size.y,0.001) : 1.8/Math.max(size.y,0.001);
+  root.scale.setScalar(s);
+  const box2=new THREE.Box3().setFromObject(root);
+  root.position.y = -box2.min.y;
+  root.position.x = -4;
+  root.position.z = 0;
+  scene.add(root); actor=root;
+  if(g.animations && g.animations.length){
+    mixer=new THREE.AnimationMixer(root);
+    const clip=pickClip(g.animations, kind==="fox"?"walk":"walk");
+    const act=mixer.clipAction(clip); act.play();
+  }
+  return root;
+}
+
+/* ---------- text overlay ---------- */
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath(); }
+function wrap(text,maxW,c){ const words=String(text||"").split(/\s+/); const out=[]; let cur="";
+  words.forEach(w=>{ const t=cur?cur+" "+w:w; if(c.measureText(t).width>maxW&&cur){out.push(cur);cur=w;} else cur=t; }); if(cur) out.push(cur); return out; }
+
+function overlay(s){
+  ctx.fillStyle="rgba(0,0,0,.55)"; ctx.fillRect(0,0,W,H*0.055); ctx.fillRect(0,H-H*0.055,W,H*0.055);
+  let subH=0;
+  if(s.text){
+    ctx.font="800 36px Manrope, sans-serif"; ctx.textAlign="center";
+    const lines=wrap(s.text,W-90,ctx); const lh=44; subH=lines.length*lh+28;
+    ctx.fillStyle="rgba(0,0,0,.62)"; roundRect(34,H-subH-34,W-68,subH,12); ctx.fill();
+    ctx.fillStyle="#fff"; let y=H-subH-34+38;
+    lines.forEach(l=>{ ctx.fillText(l,W/2,y); y+=lh; });
+  }
+  if(s.say){
+    ctx.font="700 28px Manrope, sans-serif"; ctx.textAlign="left";
+    const lines=wrap(s.say,W-120,ctx); const h=lines.length*34+54;
+    const y=H-h-(subH+58);
+    ctx.fillStyle="rgba(8,12,18,.8)"; roundRect(28,y,W-56,h,16); ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,.16)"; ctx.lineWidth=2; roundRect(28,y,W-56,h,16); ctx.stroke();
+    if(s.speaker){ ctx.fillStyle="#3fb950"; ctx.font="800 20px Manrope, sans-serif"; ctx.fillText(String(s.speaker).toUpperCase(),50,y+30); }
+    ctx.fillStyle="#fff"; ctx.font="600 28px Manrope, sans-serif";
+    let yy=y+(s.speaker?64:38); lines.forEach(l=>{ ctx.fillText(l,50,yy); yy+=34; });
+  }
+}
+
+/* ---------- render loop ---------- */
+function renderShotFrame(shot, t){
+  // actor chalta hai: -4 se +4
+  if(actor){
+    actor.position.x = -4 + t*8;
+    actor.rotation.y = Math.PI/2;
+  }
+  // camera dolly
+  camera.position.z = 9 - t*1.8;
+  camera.position.y = 3.2 - t*0.4;
+  camera.lookAt(actor?actor.position.x*0.5:0, 1.2, 0);
+  const dt=1/30;
+  if(mixer) mixer.update(dt);
+  renderer.render(scene,camera);
+
+  ctx.fillStyle="#000"; ctx.fillRect(0,0,W,H);
+  try{ ctx.drawImage(renderer.domElement,0,0,W,H); }catch(e){}
+  overlay(shot);
+}
+
+/* ---------- story ---------- */
+async function askGroq(prompt){
+  const k=key();
+  if(!k) throw new Error("Groq key nahi mili — Simple Agent page par key save karo.");
+  const r=await fetch(GROQ.base+"/chat/completions",{
+    method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+k},
+    body:JSON.stringify({model:GROQ.model,temperature:0.85,max_tokens:1200,
+      messages:[{role:"system",content:"Tum 3D film ke director ho. Sirf JSON do."},{role:"user",content:prompt}]})});
+  if(!r.ok) throw new Error("Groq HTTP "+r.status+" — "+(await r.text()).slice(0,110));
+  const j=await r.json();
+  return (j.choices&&j.choices[0]&&j.choices[0].message.content)||"";
+}
+
+document.getElementById("make").onclick=async ()=>{
+  const story=document.getElementById("topic").value.trim();
+  if(!story){ show(msg1,"bad","Pehle kahani likho."); return; }
+  const n=document.getElementById("nshots").value;
+  show(msg1,"info","Director scene plan kar raha hai…");
+  try{
+    init3D();
+    const raw=await askGroq(`Kahani: "${story}"
+Ise ${n} shots me todo (3D animation ke liye).
+Har shot: {"text":"subtitle 6-8 shabd Hinglish","say":"voice-over ek line","speaker":"Boy|Girl|Narrator",
+"scene":"jungle|cave|river|village|night","actor":"human|robot|fox"}
+Sirf JSON: {"title":"...","shots":[...]}`);
+    const d=parseJSON(raw);
+    shots=(d.shots||[]).map(s=>({text:s.text||"",say:s.say||"",speaker:s.speaker||"",
+      scene:/cave|river|village|night/.test(String(s.scene||""))?s.scene:"jungle",
+      actor:/robot|fox/.test(String(s.actor||""))?s.actor:"human"}));
+    if(!shots.length) throw new Error("plan khaali aaya");
+    document.getElementById("shots").innerHTML=shots.map((s,i)=>
+      `<div><b>${i+1}.</b> ${esc(s.text)} <span style="opacity:.6">· ${esc(s.scene)} · ${esc(s.actor)}</span></div>`).join("");
+    show(msg1,"info","3D models load ho rahe hain…");
+    buildScene(shots[0].scene);
+    await addActor(shots[0].actor);
+    renderShotFrame(shots[0],0.2);
+    show(msg1,"ok",shots.length+" shots taiyar — ab 'Film chalao' dabao.");
+  }catch(e){ show(msg1,"bad","Ruk gaya: "+e.message); }
+};
+
+/* ---------- playback ---------- */
+async function playFilm(record){
+  if(!shots.length){ show(msg2,"bad","Pehle step 1 dabao."); return; }
+  if(running) return; running=true;
+  const per=parseInt(document.getElementById("secs").value,10);
+
+  if(record){
+    const stream=stage.captureStream(30);
+    const mime=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
+    chunks=[]; recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:5000000});
+    recorder.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
+    recorder.onstop=()=>{
+      const blob=new Blob(chunks,{type:"video/webm"});
+      if(blobUrl) URL.revokeObjectURL(blobUrl);
+      blobUrl=URL.createObjectURL(blob);
+      const a=document.createElement("a"); a.href=blobUrl; a.download="seetal-3d-film-"+Date.now()+".webm";
+      document.body.appendChild(a); a.click(); a.remove();
+      show(msg2,"ok","Video ban gayi — "+(blob.size/1048576).toFixed(2)+" MB");
+    };
+    recorder.start(400);
+    show(msg2,"info","Record ho raha hai…");
+  }else show(msg2,"info","Film chal rahi hai…");
+
+  for(let i=0;i<shots.length;i++){
+    const s=shots[i];
+    buildScene(s.scene);
+    try{ await addActor(s.actor); }catch(e){}
+    if(s.say && window.speechSynthesis){
+      try{ const u=new SpeechSynthesisUtterance(s.say); u.lang="hi-IN"; u.rate=0.92; speechSynthesis.speak(u);}catch(e){}
+    }
+    await new Promise(res=>{
+      const t0=performance.now();
+      (function loop(){
+        const t=Math.min(1,(performance.now()-t0)/per);
+        renderShotFrame(s,t);
+        if(t<1) requestAnimationFrame(loop); else res();
+      })();
+    });
+  }
+  if(record && recorder && recorder.state!=="inactive") recorder.stop();
+  running=false;
+  if(!record) show(msg2,"ok","Film poori chali — ab record dabao.");
+}
+
+document.getElementById("play").onclick=()=>playFilm(false);
+document.getElementById("rec").onclick=()=>playFilm(true);
+init3D(); buildScene("jungle"); renderShotFrame({text:"",say:""},0.2);
+</script>
+</body>
+</html>
