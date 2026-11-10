@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Free Creators Hub — film, awaaz, 3D, sab free</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f1216;--surface:#171c22;--surface2:#202832;--line:#2c3641;--text:#eaf0f6;--dim:#93a3b3;
+ --green:#4caf50;--green-bg:#16241a;--blue:#64b5f6;--amber:#e0a44a;--violet:#b39ddb}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;font-size:15px;line-height:1.5;
+ background-image:radial-gradient(700px 400px at 90% -10%, rgba(76,175,80,.12), transparent 60%),radial-gradient(600px 300px at 0% 0%, rgba(100,181,246,.10), transparent 60%);
+ background-repeat:no-repeat}
+.wrap{max-width:860px;margin:0 auto;padding:20px 16px 70px}
+h1{font-size:24px;margin:0 0 4px;font-weight:800;letter-spacing:-.01em}
+.sub{color:var(--dim);font-size:14px;margin-bottom:18px}
+.controls{position:sticky;top:0;z-index:20;padding:10px 0;background:rgba(15,18,22,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+input{width:100%;padding:11px 13px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--text);font-family:inherit;font-size:14.5px;outline:none}
+input:focus{border-color:var(--green)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.chip{font-family:"Azeret Mono",monospace;font-size:11px;padding:5px 10px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--dim);cursor:pointer}
+.chip.on{background:var(--green);border-color:var(--green);color:#06170a;font-weight:700}
+h2{font-size:15px;margin:26px 0 10px;font-family:"Azeret Mono",monospace;letter-spacing:.08em;color:var(--dim);text-transform:uppercase}
+.card{display:block;text-decoration:none;color:inherit;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--line);
+ border-radius:11px;padding:12px 14px;margin-bottom:9px;transition:.15s}
+.card:hover{border-left-color:var(--green);transform:translateX(2px)}
+.card.ours{border-left-color:var(--green);background:var(--green-bg)}
+.card .t{font-weight:700;font-size:15.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.card .d{color:var(--dim);font-size:13.5px;margin-top:3px}
+.tag{font-family:"Azeret Mono",monospace;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:99px;border:1px solid var(--line);color:var(--dim)}
+.tag.ours{background:var(--green);border-color:var(--green);color:#06170a;font-weight:700}
+.tag.conn{background:rgba(100,181,246,.15);border-color:var(--blue);color:var(--blue)}
+.tag.gpu{background:rgba(224,164,74,.15);border-color:var(--amber);color:var(--amber)}
+.foot{color:var(--dim);font-size:12.5px;margin-top:26px;line-height:1.6;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Free Creators Hub</h1>
+  <div class="sub">Film, awaaz, 3D cartoon, music, images — sab free tools ek jagah. Jo hamare system se jude hain, unpar <b style="color:var(--green)">hamara</b> ya <b style="color:var(--blue)">juba hua</b> likha hai.</div>
+
+  <div class="controls">
+    <input id="q" placeholder="Search: 3D, awaaz, edit, music…" autocomplete="off">
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div id="list"></div>
+
+  <div class="foot">
+    <b>Sach:</b> free tier ki limits badalti rehti hain — har link par ek baar dekh lena. Jo cheez GPU maangti hai (Maya, VoxCPM2, Blender render), unke liye Kaggle/Modal ka free GPU hai. Hamare apne apps sabse upar hain kyunki woh bina kisi account ke chalte hain.
+  </div>
+</div>
+
+<script>
+const D = [
+ // [name, url, note, category, tag]
+ ["3D Cartoon Studio v9 (hamara)","../film3d/","Kahani likho → 3D cartoon film + Hindi awaaz + download","Hamare apps","ours"],
+ ["Film Maker v4 (hamara)","../film/","AI images se photo-motion film","Hamare apps","ours"],
+ ["Video Studio (hamara)","../video/","Camera se record, filter, blur, text, download","Hamare apps","ours"],
+ ["Seetal Agent (hamara)","../agent-simple/live/","Multi-AI agent — Groq/Gemini/OpenAI, tools, app builder","Hamare apps","ours"],
+ ["Connector (hamara)","../connector/","149 systems — kaun juda, kaise jodna hai","Hamare apps","ours"],
+ ["Sab versions (hub)","../hub/","Saare apps aur purane versions ek jagah","Hamare apps","ours"],
+
+ ["Blender","https://www.blender.org","3D modelling, animation, render — poora free, open source","3D / Cartoon",""],
+ ["Three.js","https://threejs.org","Browser me 3D — hamara studio isi par bana","3D / Cartoon","conn"],
+ ["Mixamo","https://www.mixamo.com","Free rigged characters + walk/run/dance animations (Adobe account)","3D / Cartoon",""],
+ ["Sketchfab","https://sketchfab.com","Free 3D models — filter: downloadable + free","3D / Cartoon",""],
+ ["Poly Pizza","https://poly.pizza","Free low-poly models, seedha .glb","3D / Cartoon",""],
+ ["Kenney","https://kenney.nl/assets","Free game/cartoon assets (characters, props)","3D / Cartoon",""],
+ ["Quaternius","https://quaternius.com","Free animated 3D character packs","3D / Cartoon",""],
+ ["Ready Player Me","https://readyplayer.me","Free avatar banao (selfie se)","3D / Cartoon",""],
+ ["Tinkercad","https://www.tinkercad.com","Bachchon ke liye free 3D design","3D / Cartoon",""],
+ ["Spline","https://spline.design","Browser me 3D scene, free tier","3D / Cartoon",""],
+
+ ["Edge TTS (free)","https://github.com/rany2/edge-tts","Microsoft ki free awaaz — Hindi + Indic, python se","Awaaz / TTS","conn"],
+ ["Piper TTS","https://github.com/rhasspy/piper","Offline TTS, laptop par free","Awaaz / TTS",""],
+ ["Kokoro-82M","https://huggingface.co/hexgrad/Kokoro-82M","Chhota par natural TTS, free weights","Awaaz / TTS","gpu"],
+ ["VoxCPM2","https://github.com/OpenBMB/VoxCPM","30 bhasha, 48kHz, Apache-2.0 (GPU)","Awaaz / TTS","gpu"],
+ ["Maya 2 Native","https://huggingface.co/maya-research/maya2-native","11 Indic bhasha + cloning, Apache-2.0 (GPU)","Awaaz / TTS","gpu"],
+ ["Sarvam AI","https://dashboard.sarvam.ai","Indic voice/translate — free credits","Awaaz / TTS",""],
+ ["ElevenLabs free","https://elevenlabs.io","Free tier me thoda voice generation","Awaaz / TTS",""],
+ ["Phone ki TTS","https://developer.mozilla.org/en-US/docs/Web/API/SpeechSynthesis","Browser ki built-in awaaz — bilkul free, offline","Awaaz / TTS","conn"],
+
+ ["DaVinci Resolve","https://www.blackmagicdesign.com/products/davinciresolve","Professional video editing — free version","Film / Edit",""],
+ ["CapCut","https://www.capcut.com","Phone par fast editing, free","Film / Edit",""],
+ ["Shotcut","https://shotcut.org","Open source editor, free","Film / Edit",""],
+ ["Kdenlive","https://kdenlive.org","Open source editor, free","Film / Edit",""],
+ ["FFmpeg","https://ffmpeg.org","Command line se video/audio jodna — free","Film / Edit",""],
+ ["Clipchamp","https://clipchamp.com","Browser me editing, free tier","Film / Edit",""],
+ ["Canva","https://www.canva.com","Poster, thumbnail, video — free tier","Film / Edit",""],
+
+ ["Pollinations","https://pollinations.ai","Free AI image, bina key (1 image / 45 sec)","Images","conn"],
+ ["Bing Image Creator","https://www.bing.com/create","Free AI images (credits)","Images",""],
+ ["Leonardo AI","https://leonardo.ai","Free daily credits","Images",""],
+ ["Krea","https://www.krea.ai","Free tier, fast image gen","Images",""],
+ ["ComfyUI","https://github.com/comfyanonymous/ComfyUI","Apne PC par free image gen","Images","gpu"],
+ ["Pexels","https://www.pexels.com","Free stock photo/video","Images",""],
+ ["Pixabay","https://pixabay.com","Free stock photo/video/sound","Images",""],
+
+ ["Freesound","https://freesound.org","Free sound effects — API key se app khud laata hai","Music / SFX","conn"],
+ ["Mixkit","https://mixkit.co/free-sound-effects/","Free SFX + music","Music / SFX",""],
+ ["ZapSplat","https://www.zapsplat.com","Free SFX (credit dena)","Music / SFX",""],
+ ["YouTube Audio Library","https://www.youtube.com/audiolibrary","Free music + SFX (apne account se)","Music / SFX",""],
+ ["Suno","https://suno.com","Free tier me gaana banao","Music / SFX",""],
+ ["BandLab","https://www.bandlab.com","Free music banane ka studio","Music / SFX",""],
+ ["Web Audio (hamara)","../film3d/","App khud ambience/footstep banata hai — free","Music / SFX","ours"],
+
+ ["Groq","https://console.groq.com/keys","Free LLM — kahani/script (hamara agent isse chalta hai)","AI text","conn"],
+ ["Google Gemini","https://aistudio.google.com/apikey","Free tier LLM + vision","AI text","conn"],
+ ["OpenRouter","https://openrouter.ai/keys","Free models (:free) ek key se","AI text",""],
+ ["ChatGPT free","https://chatgpt.com","Free plan","AI text",""],
+ ["Claude free","https://claude.ai","Free plan","AI text",""],
+ ["Google Docs","https://docs.google.com","Script likhne ke liye free","AI text",""],
+
+ ["Kaggle","https://www.kaggle.com","Free GPU: T4 x2, ~30 ghante/saptah","Free GPU","conn"],
+ ["Google Colab","https://colab.research.google.com","Free GPU (limited), notebook","Free GPU",""],
+ ["Modal","https://modal.com","$30/mahina free compute (~37 ghante L4)","Free GPU","conn"],
+ ["Hugging Face Spaces","https://huggingface.co/spaces","Free CPU demos (GPU paid)","Free GPU",""],
+ ["IndiaAI Compute","https://compute.indiaai.gov.in","Sarkari sasta GPU, 40% tak subsidy","Free GPU",""]
+];
+
+const CATS=["Sab", ...Array.from(new Set(D.map(d=>d[3])))];
+let cat="Sab";
+const listEl=document.getElementById("list"), chipsEl=document.getElementById("chips"), qEl=document.getElementById("q");
+
+CATS.forEach(c=>{
+  const b=document.createElement("button");
+  b.className="chip"+(c==="Sab"?" on":""); b.textContent=c;
+  b.onclick=()=>{ cat=c; [...chipsEl.children].forEach(x=>x.classList.toggle("on",x===b)); render(); };
+  chipsEl.appendChild(b);
+});
+
+const TAGLABEL={ours:"hamara", conn:"juda hua", gpu:"GPU chahiye"};
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function render(){
+  const q=qEl.value.trim().toLowerCase();
+  const items=D.filter(d=>(cat==="Sab"||d[3]===cat) && (!q || (d[0]+" "+d[2]+" "+d[3]).toLowerCase().includes(q)));
+  let html="", lastCat=null;
+  items.forEach(d=>{
+    if(d[3]!==lastCat){ html+=`<h2>${esc(d[3])}</h2>`; lastCat=d[3]; }
+    const tag = d[4] ? `<span class="tag ${d[4]}">${TAGLABEL[d[4]]}</span>` : "";
+    html+=`<a class="card ${d[4]==="ours"?"ours":""}" href="${esc(d[1])}" target="_blank" rel="noopener">
+      <div class="t">${esc(d[0])} ${tag}</div>
+      <div class="d">${esc(d[2])}</div></a>`;
+  });
+  listEl.innerHTML = html || '<div class="card"><div class="d">Kuch nahi mila.</div></div>';
+}
+qEl.addEventListener("input",render);
+render();
+</script>
+</body>
+</html>
