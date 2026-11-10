@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Vinod v10 — keys kabhi na jaayein</title>
+<title>Agent Vinod v11 — jo likha, woh saved</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -46,7 +46,7 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
 </head>
 <body>
 <div class="wrap">
-  <h1>Agent Vinod <span style="font-size:11px;color:var(--green);font-family:'Azeret Mono',monospace">v10 SAFE</span></h1>
+  <h1>Agent Vinod <span style="font-size:11px;color:var(--green);font-family:'Azeret Mono',monospace">v11 AUTOSAVE</span></h1>
   <div class="sub">Seetal ka worker — bada kaam karta hai, jhooth nahi bolta. Result ek "card" me deta hai jo Seetal ko wapas diya ja sakta hai.</div>
 
   <div class="card">
@@ -180,6 +180,16 @@ const save=()=>{
 const provEl=document.getElementById("prov"), msg=document.getElementById("msg"), outEl=document.getElementById("out");
 const taskEl=document.getElementById("task"), modeEl=document.getElementById("mode"), selEl=document.getElementById("modelSel");
 
+function harvest(){
+  let added=0;
+  allProviders().forEach(p=>{
+    const el=document.getElementById("k-"+p.id);
+    if(el && el.value.trim() && el.value.trim()!==keys[p.id]){ keys[p.id]=el.value.trim(); health[p.id]=undefined; added++; }
+  });
+  if(added){ save(); paint(); }
+  return added;
+}
+
 function allProviders(){ return PROVIDERS.concat(custom.map(c=>({id:c.id,name:c.name,kind:"openai",base:c.base,model:c.model}))); }
 
 function renderProvRows(){
@@ -194,10 +204,16 @@ function renderProvRows(){
       <button data-test="${p.id}" style="padding:6px 9px;font-size:11px">test</button>`;
     provEl.appendChild(row);
     row.querySelector("[data-test]").onclick=()=>testOne(p.id);
-    row.querySelector("#k-"+p.id).onchange=e=>{
+    const inp=row.querySelector("#k-"+p.id);
+    let tmr=null;
+    inp.oninput=e=>{
       const v=e.target.value.trim();
-      if(v){ keys[p.id]=v; health[p.id]=undefined; save(); }
-      paint();
+      clearTimeout(tmr);
+      tmr=setTimeout(()=>{ if(v){ keys[p.id]=v; health[p.id]=undefined; save(); paint(); } }, 600);
+    };
+    inp.onblur=e=>{
+      const v=e.target.value.trim();
+      if(v){ keys[p.id]=v; health[p.id]=undefined; save(); paint(); }
     };
   });
 }
@@ -304,6 +320,7 @@ async function ask(messages){
 function bub(cls,txt){ const d=document.createElement("div"); d.className="b "+cls; d.textContent=txt; outEl.appendChild(d); return d; }
 
 document.getElementById("run").onclick=async()=>{
+  harvest();
   const task=taskEl.value.trim();
   if(!task){ show("bad","Box khaali hai — grey text sirf misaal hai. Apna kaam likho, ya 'example bharo' dabao."); return; }
   const btn=document.getElementById("run"); btn.disabled=true; btn.textContent="Kaam ho raha hai…";
@@ -351,6 +368,7 @@ document.getElementById("fillProv").onclick=()=>{
 };
 
 document.getElementById("addProv").onclick=()=>{
+  harvest();
   const name=document.getElementById("cName").value.trim();
   const base=document.getElementById("cBase").value.trim();
   const model=document.getElementById("cModel").value.trim();
@@ -418,6 +436,7 @@ async function aiAdvice(report){
 }
 
 document.getElementById("check").onclick=async()=>{
+  harvest();
   const btn=document.getElementById("check"); btn.disabled=true; btn.textContent="Check ho raha hai…";
   const box=document.getElementById("sysout"); box.innerHTML="";
   const sm=document.getElementById("sysmsg"); sm.className="msg info show"; sm.textContent="Har system ko chhua ja raha hai…";
@@ -504,6 +523,7 @@ ${detail?("detail: "+detail):""}`;
 }
 
 async function testOne(id){
+  harvest();
   const p=allProviders().find(x=>x.id===id); if(!p) return;
   const el=document.getElementById("testMsg");
   el.className="msg show info"; el.textContent=p.name+" test ho raha hai…";
@@ -530,6 +550,7 @@ async function testOne(id){
 }
 
 document.getElementById("testKeys").onclick=async()=>{
+  harvest();
   const el=document.getElementById("testMsg");
   const list=allProviders().filter(p=>keys[p.id]);
   if(!list.length){ el.className="msg show bad"; el.textContent="Koi key save nahi hai — pehle ek key paste karo."; return; }
@@ -555,6 +576,7 @@ document.getElementById("testKeys").onclick=async()=>{
 };
 
 document.getElementById("expKeys").onclick=()=>{
+  harvest();
   const data=JSON.stringify({keys,models,health,custom,tasks},null,2);
   const blob=new Blob([data],{type:"application/json"});
   const url=URL.createObjectURL(blob);
