@@ -1,0 +1,46 @@
+name: Voices banao (natural, free)
+
+on:
+  push:
+    paths:
+      - "films/**.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  voices:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: edge-tts install
+        run: pip install edge-tts
+
+      - name: Har film ke lines ki awaaz banao
+        run: |
+          set -e
+          shopt -s nullglob
+          files=(films/*.json)
+          if [ ${#files[@]} -eq 0 ]; then echo "koi film json nahi mili"; exit 0; fi
+          for f in "${files[@]}"; do
+            echo "== $f"
+            python tools/voice.py "$f" --out sounds/voices
+          done
+
+      - name: Commit karo (agar kuch bana)
+        run: |
+          git config user.name "seetal-voice-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add sounds/voices || true
+          if git diff --cached --quiet; then
+            echo "kuch naya nahi bana"
+          else
+            git commit -m "voice: nayi lines ki natural awaaz (auto)"
+            git push
+          fi
