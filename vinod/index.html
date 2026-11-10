@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Vinod v3 — system manager</title>
+<title>Agent Vinod v4 — deep system manager</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -46,7 +46,7 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
 </head>
 <body>
 <div class="wrap">
-  <h1>Agent Vinod <span style="font-size:11px;color:var(--green);font-family:'Azeret Mono',monospace">v3 MANAGER</span></h1>
+  <h1>Agent Vinod <span style="font-size:11px;color:var(--green);font-family:'Azeret Mono',monospace">v4 DEEP</span></h1>
   <div class="sub">Seetal ka worker — bada kaam karta hai, jhooth nahi bolta. Result ek "card" me deta hai jo Seetal ko wapas diya ja sakta hai.</div>
 
   <div class="card">
@@ -95,6 +95,11 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
     <button id="check" style="width:100%">System check karo</button>
     <div class="msg" id="sysmsg"></div>
     <div id="sysout"></div>
+  </div>
+
+  <div class="card">
+    <label>System ka naksha (Vinod ko kya pata hai)</label>
+    <div id="map" class="b t"></div>
   </div>
 
   <div class="card">
@@ -292,7 +297,7 @@ document.getElementById("addProv").onclick=()=>{
   custom.push({id,name,base,model});
   keys[id]=key;
   try{ localStorage.setItem("vinod-custom-providers", JSON.stringify(custom)); }catch(e){}
-  save(); renderProvRows(); paint();
+  save(); renderProvRows(); paint(); paintMap();
   m.className="msg show ok"; m.textContent=name+" jud gaya — ab list me aayega.";
   document.getElementById("cName").value=""; document.getElementById("cBase").value="";
   document.getElementById("cModel").value=""; document.getElementById("cKey").value="";
@@ -309,6 +314,39 @@ const SYS=[
   ["Voices manifest","../sounds/voices/manifest.json"],
   ["Sounds readme","../sounds/README.md"]
 ];
+async function deepInfo(name,url){
+  const out={title:"",version:"",lines:0};
+  try{
+    const r=await fetch(url+"?v="+Date.now(),{cache:"no-store"});
+    const t=await r.text();
+    const m=t.match(/<title>([^<]{0,90})/i); if(m) out.title=m[1].trim();
+    const v=t.match(/\bV(\d{1,2})\b/); if(v) out.version="v"+v[1];
+    if(url.includes("manifest.json")){ try{ const j=JSON.parse(t); out.lines=(j.lines||[]).length; }catch(e){} }
+  }catch(e){}
+  return out;
+}
+async function githubInfo(){
+  const info={lastCommit:"",lastRun:"",runs:[]};
+  try{
+    const r=await fetch("https://api.github.com/repos/bhupendarsingh785/swag-page/commits?per_page=1");
+    if(r.ok){ const j=await r.json(); if(j[0]) info.lastCommit=(j[0].commit.message||"").slice(0,60)+" · "+j[0].commit.author.date.slice(0,16); }
+  }catch(e){}
+  try{
+    const r=await fetch("https://api.github.com/repos/bhupendarsingh785/swag-page/actions/runs?per_page=3");
+    if(r.ok){ const j=await r.json(); info.runs=(j.workflow_runs||[]).map(x=>x.name+" → "+(x.conclusion||x.status));
+      info.lastRun=info.runs[0]||""; }
+  }catch(e){}
+  return info;
+}
+async function aiAdvice(report){
+  try{
+    const {txt,by}=await ask([{role:"user",content:
+      "Yeh mere system ke check ka result hai (JSON):\n"+JSON.stringify(report).slice(0,3500)+
+      "\n\nTu system manager hai. Hinglish me batao: (1) sabse kamzor 3 hisse kaun se hain aur kyun, (2) har ek ka ek-ek sudhaar kaam, (3) agla step. Chhota rakh."}]);
+    return {txt,by};
+  }catch(e){ return {txt:"(AI salah nahi mili: "+e.message+")",by:"-"}; }
+}
+
 document.getElementById("check").onclick=async()=>{
   const btn=document.getElementById("check"); btn.disabled=true; btn.textContent="Check ho raha hai…";
   const box=document.getElementById("sysout"); box.innerHTML="";
@@ -324,20 +362,44 @@ document.getElementById("check").onclick=async()=>{
       if(!r.ok) note="HTTP "+r.status;
     }catch(e){ note=e.message.slice(0,40); }
     const ms=Math.round(performance.now()-t0);
-    rows.push({name,url,ok,size,ms,note});
+    const deep=ok?await deepInfo(name,url):{};
+    rows.push({name,url,ok,size,ms,note,...deep});
     if(!ok) weak.push(name+" — khulta nahi ("+(note||"?")+")");
     else if(ms>2500) weak.push(name+" — dheema ("+ms+"ms)");
     else if(size<400) weak.push(name+" — khaali/short ("+size+" chars)");
   }
-  box.innerHTML=rows.map(r=>`<div class="b ${r.ok?"a":"t"}">${r.ok?"✓":"✗"} <b>${esc(r.name)}</b> — ${r.ok?r.size+" chars, "+r.ms+"ms":"FAIL: "+esc(r.note)}</div>`).join("");
+  const gh=await githubInfo();
+  box.innerHTML=rows.map(r=>`<div class="b ${r.ok?"a":"t"}">${r.ok?"✓":"✗"} <b>${esc(r.name)}</b> — ${r.ok?(esc(r.version||"")+" "+(r.title?esc(r.title.slice(0,42))+" · ":"")+r.size+" chars, "+r.ms+"ms"+(r.lines?" · "+r.lines+" lines":"")):"FAIL: "+esc(r.note)}</div>`).join("")
+    + `<div class="b t">GitHub: last commit — ${esc(gh.lastCommit||"?")}\nRuns: ${esc(gh.runs.join(" | ")||"?")}</div>`;
   const keysN=Object.keys(keys).filter(k=>keys[k]).length;
   if(keysN===0) weak.push("koi API key nahi — Vinod kaam nahi kar payega");
   if(!rows.find(r=>r.name==="Voices manifest"&&r.ok)) weak.push("natural awaaz ka manifest nahi mila — film ki awaaz robotic rahegi");
   sm.className="msg show "+(weak.length?"bad":"ok");
   sm.textContent = weak.length ? ("Kamzor hisse ("+weak.length+"):\n• "+weak.join("\n• ")) : "Sab theek — koi kamzor hissa nahi mila.";
-  try{ localStorage.setItem("vinod-last-check", JSON.stringify({at:new Date().toISOString(),rows,weak})); }catch(e){}
+  try{ localStorage.setItem("vinod-last-check", JSON.stringify({at:new Date().toISOString(),rows,weak,gh})); }catch(e){}
+  // ab AI se salah — jo API keys hain unki poori madad
+  sm.textContent += "\n\nAI se salah li ja rahi hai…";
+  const adv=await aiAdvice({rows,weak,gh});
+  const d=document.createElement("div"); d.className="b a";
+  d.innerHTML="<b>AI ki salah — "+esc(adv.by)+"</b>\n"+esc(adv.txt);
+  box.appendChild(d);
   btn.disabled=false; btn.textContent="System check karo";
 };
+
+/* ---------- system ka naksha ---------- */
+function paintMap(){
+  const prov=allProviders().filter(p=>keys[p.id]).map(p=>p.name+(models[p.id]?" ("+models[p.id]+")":""));
+  const apps=[["3D studio","film3d — 3D cartoon film, Indic awaaz"],["Film maker","photo-motion film"],
+    ["Video studio","camera record + edit"],["Seetal Agent","multi-AI + app builder"],
+    ["Free hub","56 free tools"],["Dev stack","65 coding systems"],["Voices","edge-tts natural, GitHub Action se"]]; 
+  const jude=["GitHub (juda hua)","Netlify (juda hua)","Supabase (juda hua)","Firecrawl (juda hua)","Replit (juda hua, publish paid)","Cloudflare/Sentry/Apify (auth baaki)"];
+  document.getElementById("map").textContent =
+    "APPS:\n• "+apps.map(a=>a[0]+" — "+a[1]).join("\n• ")+
+    "\n\nAI MODELS (keys):\n• "+(prov.join("\n• ")||"koi key nahi")+
+    "\n\nPLATFORMS:\n• "+jude.join("\n• ")+
+    "\n\nBHASHA: Hindi + 9 Indic (script se pehchan)";
+}
+paintMap();
 
 /* ---------- tasks ---------- */
 let tasks=[];
