@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seetal Agent — v10 (khud check karta hai — saaf sach)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#fdf8f2; --surface:#ffffff; --line:#e6dbcd; --line2:#cbb9a4;
+  --text:#2a211b; --dim:#8a7768; --green:#1f8b24; --green-bg:#e8f5e6;
+  --red:#b3261e; --red-bg:#fdeceb; --blue:#1c5f8a; --amber:#a86a00;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#1a1613;--surface:#241f1b;--line:#3a322b;--line2:#4d4239;--text:#f4ece3;--dim:#a3927f;
+    --green:#4fbf55;--green-bg:#1b2e1b;--red:#f2a09b;--red-bg:#33201e;--blue:#8dc4e8;--amber:#e0b062;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;font-size:17px;line-height:1.55}
+.wrap{max-width:640px;margin:0 auto;padding:22px 18px 60px}
+h1{font-size:24px;margin:0 0 4px;font-weight:800}
+.sub{color:var(--dim);font-size:15px;margin-bottom:20px}
+
+/* ---- big pointer banner ---- */
+.pointer{text-align:center;margin:6px 0 10px}
+.pointer .big{font-size:21px;font-weight:800;color:var(--green);letter-spacing:.01em}
+.pointer .arrow{font-size:34px;line-height:1;color:var(--green);display:block;animation:bob 1s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(8px)}}
+@media (prefers-reduced-motion:reduce){.pointer .arrow{animation:none}}
+
+.step{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+.step h2{font-size:16px;margin:0 0 12px;font-weight:800;display:flex;align-items:center;gap:10px}
+.num{width:26px;height:26px;border-radius:50%;background:var(--text);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex:none}
+
+/* ---- the box that must be found ---- */
+.ants{position:relative;border-radius:12px;padding:2px}
+.ants::before{content:"";position:absolute;inset:-4px;border-radius:14px;pointer-events:none;
+  background:
+    repeating-linear-gradient(90deg,var(--green) 0 14px,transparent 14px 28px) top left/28px 3px repeat-x,
+    repeating-linear-gradient(90deg,var(--green) 0 14px,transparent 14px 28px) bottom left/28px 3px repeat-x,
+    repeating-linear-gradient(180deg,var(--green) 0 14px,transparent 14px 28px) top left/3px 28px repeat-y,
+    repeating-linear-gradient(180deg,var(--green) 0 14px,transparent 14px 28px) top right/3px 28px repeat-y;
+  animation:ants .9s linear infinite;
+  opacity:1;transition:opacity .3s}
+@keyframes ants{to{background-position:28px 0,-28px 0,0 -28px,0 28px}}
+.ants.done::before{opacity:0}
+.ants input{width:100%;padding:15px 14px;font-size:17px;font-family:"Azeret Mono",monospace;border:2px solid var(--green);
+  border-radius:10px;background:var(--bg);color:var(--text);outline:none;letter-spacing:.02em}
+.ants input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(28,95,138,.15)}
+.ants.done input{border-color:var(--green);background:var(--green-bg)}
+
+button{width:100%;margin-top:12px;padding:15px;font-size:17px;font-weight:800;font-family:inherit;border:none;border-radius:10px;
+  background:var(--text);color:var(--bg);cursor:pointer;transition:.15s}
+button:hover:not(:disabled){opacity:.88}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.green{background:var(--green);color:#fff}
+
+/* ---- result bars ---- */
+.bar{margin-top:14px;border-radius:10px;padding:14px 16px;font-size:16px;font-weight:600;display:none;align-items:center;gap:10px;flex-wrap:wrap}
+.bar.show{display:flex}
+.bar.ok{background:var(--green-bg);border:2px solid var(--green);color:var(--green)}
+.bar.bad{background:var(--red-bg);border:2px solid var(--red);color:var(--red)}
+.bar.info{background:var(--surface);border:1px dashed var(--line2);color:var(--dim);font-weight:500}
+.dots{display:inline-flex;gap:5px;align-items:center}
+.dots i{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.3;animation:blink 1.1s infinite}
+.dots i:nth-child(2){animation-delay:.18s} .dots i:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,100%{opacity:.25}50%{opacity:1}}
+.ticks{font-family:"Azeret Mono",monospace;letter-spacing:2px}
+
+textarea{width:100%;padding:14px;font-size:17px;font-family:inherit;border:2px solid var(--line2);border-radius:10px;background:var(--bg);color:var(--text);outline:none;min-height:90px;resize:vertical}
+textarea:focus{border-color:var(--blue)}
+
+.kept{margin-top:14px;border-top:1px dashed var(--line2);padding-top:12px;display:none}
+.kept .t{font-size:12px;font-family:"Azeret Mono",monospace;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.krow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:15px}
+.krow:last-child{border-bottom:none}
+.krow .nm{font-weight:700}
+.krow .st{font-size:12.5px;font-family:"Azeret Mono",monospace;color:var(--dim)}
+.krow .st.ok{color:var(--green)} .krow .st.bad{color:var(--red)}
+.krow button{width:auto;margin:0;padding:6px 10px;font-size:12px;font-weight:600;background:transparent;border:1px solid var(--line2);color:var(--dim)}
+
+.out{margin-top:16px}
+.out .b{padding:13px 15px;border-radius:10px;margin-bottom:9px;font-size:16px;white-space:pre-wrap;overflow-wrap:anywhere}
+.out .u{background:var(--blue);color:#fff}
+.out .a{background:var(--surface);border:1px solid var(--line)}
+.out .t{font-family:"Azeret Mono",monospace;font-size:12.5px;background:var(--bg);border:1px dashed var(--line2);color:var(--dim)}
+.foot{color:var(--dim);font-size:13px;margin-top:26px;line-height:1.6}
+.foot a{color:var(--blue)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Seetal Agent <span style="font-size:13px;color:var(--dim);font-family:'Azeret Mono',monospace">v10</span></h1>
+  <div class="sub">Bas ek jagah key daalni hai — neeche hari dashed line wale box me.</div>
+
+  <div class="pointer">
+    <div class="big">YAHAN KEY PASTE KARO</div>
+    <span class="arrow">▼</span>
+  </div>
+
+  <div class="step">
+    <h2><span class="num">1</span> API key</h2>
+    <div class="ants" id="antsBox">
+      <input id="key" type="password" placeholder="key yahan chipkado… (AQ. / AIza / gsk_)" autocomplete="off" spellcheck="false">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+      <select id="modelSel" style="flex:1;min-width:0;padding:10px;border-radius:9px;border:2px solid var(--line2);background:var(--bg);color:var(--text);font-family:'Azeret Mono',monospace;font-size:12.5px">
+        <option value="">— model (khud chun lega) —</option>
+      </select>
+      <button id="loadModels" style="width:auto;margin:0;padding:10px 12px;font-size:12.5px">models laao</button>
+    </div>
+    <button id="test">Save karo aur test karo</button>
+    <button id="selfcheck" style="background:transparent;border:2px solid var(--green);color:var(--green)">khud check karo (self-test)</button>
+    <div class="bar info show" id="idle"><span class="dots"><i></i><i></i><i></i></span> intezaar — key paste hone ka</div>
+    <div class="bar" id="testMsg"></div>
+
+    <div class="kept" id="kept">
+      <div class="t">Save ki hui keys</div>
+      <div id="klist"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button id="expKeys" style="width:auto;margin:0;padding:8px 12px;font-size:12.5px">keys ka backup lo</button>
+      <button id="impKeys" style="width:auto;margin:0;padding:8px 12px;font-size:12.5px">backup wapas lao</button>
+      <input id="impFile" type="file" accept=".json" style="display:none">
+    </div>
+  </div>
+
+  <div class="step">
+    <h2><span class="num">2</span> Kya karna hai</h2>
+    <textarea id="goal" placeholder="ek line me ek kaam — 3 line likho to 3 kaam ek ke baad ek honge"></textarea>
+    <button class="green" id="run" disabled>Chalao</button>
+    <div class="bar info show" id="hint"><span class="dots"><i></i><i></i><i></i></span> pehle key test karo</div>
+  </div>
+
+  <div class="out" id="out"></div>
+
+  <div class="foot">
+    Keys isi browser me save hoti hain — naya version kholne par bhi bachi rehti hain. Purana version: <a href="../v9/">v9</a>, <a href="../v8/">v8</a>, <a href="../v7/">v7</a>.
+  </div>
+</div>
+
+<script>
+const KSTORE="seetal-keys-v1";
+const ORDER=["gemini","groq","openrouter","cerebras","mistral"];
+const P={
+  gemini:{name:"Google Gemini",kind:"gemini",base:"https://generativelanguage.googleapis.com/v1beta",model:"gemini-2.0-flash"},
+  groq:{name:"Groq",kind:"openai",base:"https://api.groq.com/openai/v1",model:"llama-3.3-70b-versatile"},
+  openrouter:{name:"OpenRouter",kind:"openai",base:"https://openrouter.ai/api/v1",model:"meta-llama/llama-3.3-70b-instruct:free"},
+  cerebras:{name:"Cerebras",kind:"openai",base:"https://api.cerebras.ai/v1",model:"llama-3.3-70b"},
+  mistral:{name:"Mistral",kind:"openai",base:"https://api.mistral.ai/v1",model:"mistral-small-latest"}
+};
+let keys={}, health={};
+try{ const s=JSON.parse(localStorage.getItem(KSTORE)||"{}"); keys=s.keys||{}; health=s.health||{}; }catch(e){}
+const saveKeys=()=>{ try{ localStorage.setItem(KSTORE, JSON.stringify({keys,health})); }catch(e){} };
+
+const keyEl=document.getElementById("key"), testMsg=document.getElementById("testMsg");
+const idle=document.getElementById("idle"), hint=document.getElementById("hint");
+const runBtn=document.getElementById("run"), goalEl=document.getElementById("goal"), outEl=document.getElementById("out");
+const antsBox=document.getElementById("antsBox");
+
+function detect(k){
+  k=(k||"").trim();
+  if(k.startsWith("gsk_")) return "groq";
+  if(k.startsWith("sk-or-")) return "openrouter";
+  if(k.startsWith("csk-")) return "cerebras";
+  if(k.startsWith("AIza")||k.startsWith("AQ")) return "gemini";
+  if(k.length>60) return "mistral";
+  return "gemini";
+}
+function esc(x){ return String(x==null?"":x).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function setBar(el, cls, html){ el.className="bar show "+cls; el.innerHTML=html; }
+function dots(){ return '<span class="dots"><i></i><i></i><i></i></span>'; }
+
+function paintKeys(){
+  const box=document.getElementById("kept"), list=document.getElementById("klist");
+  const have=ORDER.filter(id=>keys[id]);
+  box.style.display = have.length ? "block" : "none";
+  list.innerHTML = have.map(id=>{
+    const h=health[id];
+    const st = h==="ok" ? '<span class="st ok">chalu ✓</span>' : h==="bad" ? '<span class="st bad">fail ✗</span>' : '<span class="st">save hai</span>';
+    return `<div class="krow"><span class="nm">${P[id].name}</span>${st}<button data-del="${id}">hatao</button></div>`;
+  }).join("");
+  [...list.querySelectorAll("[data-del]")].forEach(b=>{
+    b.onclick=()=>{ if(!confirm(P[b.dataset.del].name+" ki key hata dein?")) return;
+      delete keys[b.dataset.del]; delete health[b.dataset.del]; saveKeys(); paintKeys(); };
+  });
+  updRun();
+}
+function updRun(){
+  const any=ORDER.some(id=>keys[id]);
+  runBtn.disabled=!any;
+  hint.classList.toggle("show", !any);
+}
+const POLICY=`Tum Seetal Agent ho — Swag ki madad karne wali chhoti agent.
+Sirf JSON me jawab do, koi extra text nahi:
+{"thought":"chhota soch","tool":"tool_name","args":{...}}  ya kaam poora hone par {"final":"Hinglish me saaf jawab"}.
+Ek baar me ek tool. Sirf diye gaye tools use karo. Data jhooth mat banao — tool fail ho to saaf bolo.
+Jawab Hinglish me, chhota aur seedha.
+7. Kaam bada ho to pehle chhote steps me todo, phir ek-ek tool chalao.
+8. App banana ho to make_app se poora chalta hua single-file HTML do — placeholder nahi, asli code.`;
+const TOOLS=[["time_now","{}","date/time"],["calc",'{"expr":"..."}',"ganit"],["wiki",'{"q":"..."}',"Wikipedia"],
+ ["quote",'{"symbol":"..."}',"Yahoo price"],["crypto",'{"coin":"bitcoin"}',"crypto price"],
+ ["http_get",'{"url":"https://..."}',"allowlist wale site se text"],
+ ["note_save",'{"key":"...","value":"..."}',"note"],["note_get",'{"key":"..."}',"note padho"],
+ ["notes_list","{}","saare notes"],
+ ["make_app",'{"name":"app.html","html":"..."}',"naya app file banao aur download do"]];
+
+const MSTORE="seetal-models-v1";
+let models={};
+try{ models=JSON.parse(localStorage.getItem(MSTORE)||"{}"); }catch(e){}
+const saveModels=()=>{ try{ localStorage.setItem(MSTORE, JSON.stringify(models)); }catch(e){} };
+let lastModel="";
+
+/* kaam karne wale models — pehle yahi try hote hain, random model kabhi nahi */
+const CURATED={
+  groq:["qwen/qwen3.8-27b","openai/gpt-oss-120b","openai/gpt-oss-20b","allam-2-7b"],
+  openrouter:["meta-llama/llama-3.3-70b-instruct:free","deepseek/deepseek-chat-v3-0324:free","google/gemini-2.0-flash-exp:free","mistralai/mistral-7b-instruct:free","qwen/qwen-2.5-72b-instruct:free"],
+  cerebras:["llama-3.3-70b","llama3.1-8b"],
+  mistral:["mistral-small-latest","open-mistral-nemo"]
+};
+const BADMODEL=/embed|whisper|tts|audio|speech|image|vision|moderation|rerank|dall|sdxl|stable-diffusion|flux|orpheus|guard|clip|rerank|transcribe|realtime|live|video/i;
+function chatModels(id, list){
+  const cur=CURATED[id]||[];
+  let f=list.filter(m=>!BADMODEL.test(m));
+  if(id==="openrouter") f=f.filter(m=>m.endsWith(":free")||/instruct|chat/i.test(m));
+  // curated pehle, phir baaki
+  const out=[...cur.filter(m=>list.includes(m)), ...f.filter(m=>!cur.includes(m))];
+  return [...new Set(out)];
+}
+
+async function geminiList(key){
+  const r=await fetch(P.gemini.base+"/models?pageSize=200",{headers:{"x-goog-api-key":key}});
+  if(!r.ok) throw new Error("model list HTTP "+r.status);
+  const j=await r.json();
+  const names=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent"))
+    .map(m=>String(m.name).replace(/^models\//,""));
+  if(!names.length) throw new Error("koi gemini model nahi mila");
+  return names;
+}
+function pickGemini(names){
+  const score=n=>{
+    let s=0;
+    if(/flash/i.test(n)) s+=4;
+    if(/pro/i.test(n)) s+=1;
+    if(/latest/i.test(n)) s+=2;
+    if(/preview|exp|thinking|lite|image|tts|audio|embed|live/i.test(n)) s-=4;
+    const v=(n.match(/(\d+(?:\.\d+)?)/)||[0,0])[1];
+    s+=Number(v)||0;
+    return s;
+  };
+  return [...names].sort((a,b)=>score(b)-score(a))[0];
+}
+async function openaiList(id){
+  const r=await fetch(P[id].base+"/models",{headers:{"Authorization":"Bearer "+keys[id]}});
+  if(!r.ok) throw new Error("model list HTTP "+r.status);
+  const j=await r.json();
+  const ids=(j.data||[]).map(m=>m.id);
+  if(!ids.length) throw new Error("koi model nahi mila");
+  return ids;
+}
+
+async function geminiOnce(key, model, messages){
+  const contents=messages.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]}));
+  const r=await fetch(`${P.gemini.base}/models/${encodeURIComponent(model)}:generateContent`,{
+    method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
+    body:JSON.stringify({systemInstruction:{parts:[{text:POLICY}]},contents,generationConfig:{temperature:0.3,maxOutputTokens:1800}})});
+  if(!r.ok){
+    const body=await r.text();
+    const err=new Error("HTTP "+r.status+" — "+body.slice(0,140));
+    err.status=r.status; throw err;
+  }
+  const j=await r.json(); const c=j.candidates&&j.candidates[0];
+  return (c&&c.content&&c.content.parts||[]).map(x=>x.text||"").join("");
+}
+async function openaiOnce(id, model, messages){
+  const r=await fetch(P[id].base+"/chat/completions",{
+    method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+keys[id]},
+    body:JSON.stringify({model,temperature:0.3,max_tokens:1800,messages:[{role:"system",content:POLICY},...messages]})});
+  if(!r.ok){
+    const body=await r.text();
+    const err=new Error("HTTP "+r.status+" — "+body.slice(0,140));
+    err.status=r.status; throw err;
+  }
+  const j=await r.json();
+  const ch=(j.choices&&j.choices[0])||{};
+  const txt=(ch.message&&ch.message.content)||"";
+  if(!String(txt).trim()){
+    const err=new Error("jawab khaali aaya (reasoning model) — "+(ch.finish_reason||"?"));
+    err.status=422; throw err;
+  }
+  return txt;
+}
+
+/* model purana ho gaya to list se naya chuno aur ek baar dobara try */
+async function callOne(id, messages){
+  const key=keys[id];
+  if(P[id].kind==="gemini"){
+    const cands=[];
+    let model=models.gemini;
+    if(model) cands.push(model);
+    try{ const names=await geminiList(key); cands.push(pickGemini(names)); }
+    catch(e){ /* list na aaye to neeche ke naam try honge */ }
+    cands.push("gemini-flash-latest","gemini-2.5-flash","gemini-2.0-flash","gemini-pro-latest");
+    const seen=new Set(); let lastErr=null;
+    for(const m of cands){
+      if(!m||seen.has(m)) continue; seen.add(m);
+      try{
+        const t=await geminiOnce(key,m,messages);
+        models.gemini=m; saveModels(); lastModel=m; return t;
+      }catch(e){ lastErr=e; }
+    }
+    throw lastErr||new Error("gemini se baat nahi bani");
+  }
+  const cands=[];
+  if(models[id]) cands.push(models[id]);
+  (CURATED[id]||[]).forEach(m=>cands.push(m));
+  cands.push(P[id].model);
+  const seen=new Set(); let lastErr=null;
+  for(const m of cands){
+    if(!m||seen.has(m)) continue; seen.add(m);
+    try{
+      const t=await openaiOnce(id,m,messages);
+      models[id]=m; saveModels(); lastModel=m; return t;
+    }catch(e){ lastErr=e; }
+  }
+  // curated sab fail — list se sabse kaam ka model chuno
+  try{
+    const all=chatModels(id, await openaiList(id));
+    const score=m=>{let v=0;
+      if(/gpt-oss-120b/i.test(m)) v+=9;
+      if(/gpt-oss-20b/i.test(m)) v+=7;
+      if(/qwen3?[.-]?\d/i.test(m)) v+=6;
+      if(/llama-3\.3|llama-3\.1/i.test(m)) v+=6;
+      if(/70b|120b|72b/i.test(m)) v+=4;
+      if(/instruct|chat/i.test(m)) v+=2;
+      if(/guard|whisper|tts/i.test(m)) v-=9;
+      return v;};
+    const list=[...all].sort((a,b)=>score(b)-score(a)).slice(0,4);
+    for(const m of list){
+      if(seen.has(m)) continue; seen.add(m);
+      try{
+        const t=await openaiOnce(id,m,messages);
+        models[id]=m; saveModels(); lastModel=m; return t;
+      }catch(e){ lastErr=e; }
+    }
+  }catch(e){}
+  throw lastErr||new Error("is provider se baat nahi bani");
+}
+
+async function callModel(messages){
+  const list=ORDER.filter(id=>keys[id]);
+  if(!list.length) throw new Error("koi key save nahi hai");
+  let lastErr=null;
+  for(const id of list){
+    try{
+      const t=await callOne(id, messages);
+      if(!String(t).trim()) throw new Error("jawab khaali aaya");
+      health[id]="ok"; saveKeys(); paintKeys();
+      return t;
+    }catch(e){ health[id]="bad"; saveKeys(); paintKeys(); lastErr=e; }
+  }
+  throw lastErr||new Error("saari keys fail");
+}
+
+document.getElementById("test").onclick=async()=>{
+  const k=keyEl.value.trim();
+  let id;
+  if(k){ id=detect(k); keys[id]=k; saveKeys(); paintKeys(); }
+  else{
+    // box khaali — pehle se save ki hui key se test karo
+    id=ORDER.find(x=>keys[x]);
+    if(!id){ setBar(testMsg,"bad","✗ Pehle key paste karo — upar wale box me."); return; }
+  }
+  idle.classList.remove("show");
+  setBar(testMsg,"info",dots()+" "+P[id].name+" test ho raha hai…");
+  try{
+    const t=await callOne(id,[{role:"user",content:"Sirf ek line likho: OK"}]);
+    if(!String(t).trim()) throw new Error("jawab khaali aaya");
+    health[id]="ok"; saveKeys(); paintKeys();
+    antsBox.classList.add("done");
+    setBar(testMsg,"ok",'<span class="ticks">✓✓✓</span> CHALU HAI — '+P[id].name+(lastModel?' ('+lastModel+')':'')+' jud gaya. Ab neeche kaam likho.');
+    keyEl.value="";
+    goalEl.focus();
+  }catch(e){
+    health[id]="bad"; saveKeys(); paintKeys();
+    antsBox.classList.remove("done");
+    setBar(testMsg,"bad",
+      '<div>✗ '+esc(friendly(e))+'</div>'+
+      '<pre style="white-space:pre-wrap;word-break:break-word;font-size:11.5px;max-height:150px;overflow:auto;margin:8px 0 0;opacity:.85">'+esc(e.message)+'</pre>'+
+      '<button id="copyErr" style="width:auto;margin-top:8px;padding:7px 12px;font-size:12px;background:transparent;border:1px solid currentColor;color:inherit">error copy karo</button>');
+    const cb=document.getElementById("copyErr");
+    if(cb) cb.onclick=async()=>{ try{ await navigator.clipboard.writeText(e.message); cb.textContent="copy ho gaya ✓"; }catch(_){ prompt("Copy karo:", e.message); } };
+  }
+};
+keyEl.addEventListener("input", ()=>{ if(keyEl.value.trim()) idle.classList.remove("show"); });
+
+function parseJSON(t){
+  t=String(t||"").trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+  const a=t.indexOf("{"),b=t.lastIndexOf("}");
+  if(a>=0&&b>a) t=t.slice(a,b+1);
+  return JSON.parse(t);
+}
+async function runTool(name,args){
+  args=args||{};
+  if(name==="time_now"){const n=new Date();return {ist:n.toLocaleString("en-IN",{timeZone:"Asia/Kolkata"}),day:n.toLocaleDateString("en-IN",{weekday:"long",timeZone:"Asia/Kolkata"})};}
+  if(name==="calc"){const e=String(args.expr||"").replace(/[^0-9+\-*/%.() ]/g,"");if(!e)throw new Error("expr khaali");
+    const v=Function('"use strict";return ('+e+')')();if(typeof v!=="number"||!isFinite(v))throw new Error("number nahi bana");return {expr:e,value:v};}
+  if(name==="wiki"){const r=await fetch("https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch="+encodeURIComponent(args.q||"")+"&format=json&origin=*&srlimit=3");
+    const j=await r.json();const h=(j.query&&j.query.search||[]).map(s=>({title:s.title,snippet:String(s.snippet).replace(/<[^>]+>/g,"")}));
+    if(!h.length)throw new Error("kuch nahi mila");return h;}
+  if(name==="quote"){const s=String(args.symbol||"").trim();if(!s)throw new Error("symbol khaali");
+    const u="https://query1.finance.yahoo.com/v8/finance/chart/"+encodeURIComponent(s)+"?range=1d&interval=5m";
+    const r=await fetch("https://api.allorigins.win/raw?url="+encodeURIComponent(u));const j=await r.json();
+    const m=j.chart&&j.chart.result&&j.chart.result[0];if(!m)throw new Error("Yahoo se data nahi aaya");
+    return {symbol:s,price:m.meta.regularMarketPrice,prev:m.meta.chartPreviousClose,currency:m.meta.currency};}
+  if(name==="note_save"){const k=String(args.key||"").slice(0,60);if(!k)throw new Error("key khaali");
+    const ns=JSON.parse(localStorage.getItem("seetal-notes")||"{}");
+    ns[k]={v:String(args.value||"").slice(0,1000),at:new Date().toISOString()};
+    localStorage.setItem("seetal-notes",JSON.stringify(ns));return {saved:k};}
+  if(name==="notes_list"){const ns=JSON.parse(localStorage.getItem("seetal-notes")||"{}");
+    return Object.keys(ns).map(k=>({key:k,value:String(ns[k].v).slice(0,100)}));}
+  if(name==="crypto"){
+    const c=String(args.coin||"bitcoin").toLowerCase().replace(/\s+/g,"-");
+    const r=await fetch("https://api.coingecko.com/api/v3/simple/price?ids="+encodeURIComponent(c)+"&vs_currencies=inr,usd&include_24hr_change=true");
+    const j=await r.json(); if(!j[c]) throw new Error("yeh coin nahi mila: "+c);
+    return Object.assign({coin:c}, j[c]);
+  }
+  if(name==="http_get"){
+    const u=String(args.url||"");
+    if(!hostOk(u)) throw new Error("yeh host allowlist me nahi: "+u);
+    const r=await fetch("https://api.allorigins.win/raw?url="+encodeURIComponent(u));
+    const t=await r.text();
+    return {url:u, chars:t.length, text:t.slice(0,2500)};
+  }
+  if(name==="note_get"){
+    const ns=JSON.parse(localStorage.getItem("seetal-notes")||"{}");
+    const k=String(args.key||"");
+    if(!ns[k]) throw new Error("aisa note nahi: "+k);
+    return ns[k];
+  }
+  if(name==="make_app"){
+    const nm=String(args.name||"app.html").replace(/[^a-zA-Z0-9._-]/g,"_");
+    let h=String(args.html||"");
+    if(h.length<50) throw new Error("html bahut chhota hai");
+    if(!/^\s*<!DOCTYPE|^\s*<html/i.test(h)) h='<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+nm+'</title></head><body>\n'+h+'\n</body></html>';
+    const blob=new Blob([h],{type:"text/html"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download=nm; document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },4000);
+    return {saved:nm, size:h.length, note:"file download ho gayi — Downloads me dekho"};
+  }
+  throw new Error("aisa tool nahi hai: "+name);
+}
+function bub(cls,text){
+  const d=document.createElement("div");d.className="b "+cls;d.textContent=text;
+  outEl.appendChild(d); if(d.scrollIntoView) d.scrollIntoView({behavior:"smooth",block:"nearest"}); return d;
+}
+async function runOne(goal){
+  bub("u",goal);
+  const messages=[{role:"user",content:"Kaam: "+goal+"\n\nTools: "+TOOLS.map(t=>t[0]+"("+t[1]+")").join(", ")+"\n\nSirf JSON me jawab do."}];
+  for(let i=0;i<12;i++){
+    let raw;
+    try{ raw=await callModel(messages); }catch(e){ bub("a","Error: "+e.message); break; }
+    let obj;
+    try{ obj=parseJSON(raw); }catch(e){ bub("a",raw.trim()); messages.push({role:"assistant",content:raw},{role:"user",content:'Sirf JSON do: {"final":"..."} ya {"tool":"...","args":{...}}'}); continue; }
+    if(obj.final){ bub("a",obj.final); break; }
+    if(!obj.tool){ messages.push({role:"assistant",content:raw},{role:"user",content:"tool ya final do — JSON me."}); continue; }
+    const tb=bub("t","▶ "+obj.tool+"  "+JSON.stringify(obj.args||{}));
+    let res,ok=true;
+    try{ res=await runTool(obj.tool,obj.args); }catch(e){ ok=false; res={error:e.message}; }
+    tb.textContent+="\n"+(ok?"✓ ":"✗ ")+JSON.stringify(res).slice(0,300);
+    messages.push({role:"assistant",content:raw},{role:"user",content:"TOOL RESULT ("+obj.tool+"): "+JSON.stringify(res).slice(0,1500)+"\n\nAgla step JSON me."});
+  }
+}
+
+
+
+runBtn.onclick=async()=>{
+  const raw=goalEl.value.trim(); if(!raw) return;
+  const tasks=raw.split("\n").map(function(t){return t.trim();}).filter(function(t){return t.length>2;});
+  outEl.innerHTML=""; runBtn.disabled=true; runBtn.textContent="Chal raha hai…";
+  for(let ti=0; ti<tasks.length; ti++){
+    if(tasks.length>1) bub("t","— kaam "+(ti+1)+"/"+tasks.length+" —");
+    await runOne(tasks[ti]);
+  }
+  runBtn.disabled=false; runBtn.textContent="Chalao";
+};
+
+/* keys ka backup — kuch bhi na khoye */
+document.getElementById("expKeys").onclick=function(){
+  const data=JSON.stringify({keys:keys, models:models, health:health, notes:JSON.parse(localStorage.getItem("seetal-notes")||"{}")}, null, 2);
+  const blob=new Blob([data],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="seetal-agent-backup.json"; document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },4000);
+  setBar(testMsg,"ok","Backup file download ho gayi — isse keys kabhi nahi khoyengi.");
+};
+document.getElementById("impKeys").onclick=function(){ document.getElementById("impFile").click(); };
+document.getElementById("impFile").onchange=async function(e){
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    const j=JSON.parse(await f.text());
+    if(j.keys) Object.keys(j.keys).forEach(function(k){ keys[k]=j.keys[k]; });
+    if(j.models) Object.keys(j.models).forEach(function(k){ models[k]=j.models[k]; });
+    if(j.health) Object.keys(j.health).forEach(function(k){ health[k]=j.health[k]; });
+    if(j.notes) localStorage.setItem("seetal-notes", JSON.stringify(j.notes));
+    saveKeys(); saveModels(); paintKeys();
+    setBar(testMsg,"ok","Backup wapas aa gaya — "+Object.keys(keys).length+" keys mili.");
+  }catch(err){ setBar(testMsg,"bad","Backup file padhi nahi gayi: "+err.message); }
+};
+
+/* ---- model picker ---- */
+const sel=document.getElementById("modelSel");
+function fillSel(list, chosen){
+  sel.innerHTML='<option value="">— model (khud chun lega) —</option>' +
+    list.map(m=>`<option value="${m}"${m===chosen?" selected":""}>${m}</option>`).join("");
+}
+async function refreshModels(){
+  let id=ORDER.find(x=>keys[x]);
+  if(!id && keyEl.value.trim()){
+    const guess=detect(keyEl.value.trim());
+    keys[guess]=keyEl.value.trim(); saveKeys(); paintKeys(); id=guess;
+  }
+  if(!id){ setBar(testMsg,"bad","Pehle key paste karo — phir models aa jayenge."); return; }
+  setBar(testMsg,"info",dots()+" models ki list aa rahi hai…");
+  try{
+    let list;
+    if(P[id].kind==="gemini") list=(await geminiList(keys[id])).slice(0,40);
+    else list=chatModels(id, await openaiList(id)).slice(0,40);
+    fillSel(list, models[id]||models.gemini||"");
+    setBar(testMsg,"ok","Model chuno neeche wali list se — free tier wala model chuno. ("+list.length+" mile)");
+  }catch(e){
+    if(String(e.message).includes("401")) setBar(testMsg,"bad","Save ki hui key Groq/Google ne reject kar di (401). Neeche wale box me key dobara paste karo — poori, bina space.");
+    else setBar(testMsg,"bad","Models nahi mile: "+e.message);
+  }
+}
+document.getElementById("loadModels").onclick=refreshModels;
+sel.onchange=()=>{
+  const v=sel.value;
+  if(!v) return;
+  const id=ORDER.find(x=>keys[x])||"gemini";
+  if(P[id].kind==="gemini") models.gemini=v; else models[id]=v;
+  saveModels();
+  setBar(testMsg,"info","Model set: "+v+" — ab test karo.");
+};
+
+function friendly(e){
+  const m=String(e.message||"");
+  if(m.includes("429")) return "Quota khatam (429) — is key ka free limit aaj poora ho gaya.\nDo raste: (1) Groq ki free key daalo (gsk_ se shuru), (2) kal quota reset hone ka wait karo, ya model list me doosra model chuno.";
+  if(m.includes("404")) return "Yeh model band ho gaya — 'models laao' dabao aur list me se koi chuno.";
+  if(m.includes("401")||m.includes("403")) return "Key accept nahi hui — dobara copy karo ya AI Studio se nayi banao.";
+  if(/terms acceptance|requires terms|accept the terms/i.test(m)) return "Yeh model pehle terms maangta hai — 'models laao' dabao aur list me se ':free' wala instruct model chuno.";
+  if(m.includes("400")) return "Yeh model is kaam ke liye theek nahi — 'models laao' dabao aur list se doosra model chuno.";
+  return m;
+}
+
+
+/* ---- self test: har cheez asli API se jaanchta hai, andaza nahi ---- */
+async function selfTest(){
+  const id=ORDER.find(x=>keys[x]);
+  if(!id){ setBar(testMsg,"bad","Koi key save nahi hai — pehle paste karo."); return; }
+  const key=keys[id];
+  const rows=[];
+  const line=(ok,txt)=>rows.push('<div style="display:flex;gap:8px;align-items:flex-start;margin-top:4px"><b style="color:'+(ok?'var(--green)':'var(--red)')+'">'+(ok?'✓':'✗')+'</b><span>'+esc(txt)+'</span></div>');
+  const draw=(cls)=>setBar(testMsg,cls,rows.join(""));
+
+  setBar(testMsg,"info",dots()+" check chal raha hai — asli API se…");
+  await new Promise(r=>setTimeout(r,50));
+
+  // 1. key ka format
+  const fmt = P[id].kind==="gemini" ? /^(AQ|AIza)/.test(key) : /^gsk_|^sk-or-|^csk-/.test(key);
+  line(fmt, "Key ka format: "+(fmt?"theek":"yeh "+P[id].name+" ki key jaisi nahi lagti")+" ("+key.slice(0,4)+"…)");
+  draw("info");
+
+  // 2. models list
+  let list=[];
+  try{
+    list = P[id].kind==="gemini" ? await geminiList(key) : chatModels(id, await openaiList(id));
+    line(true, "Models list: "+list.length+" chat models mile");
+  }catch(e){ line(false, "Models list fail: "+e.message); }
+  draw("info");
+
+  // 3. asli chat call
+  let reply="";
+  try{
+    const m = (P[id].kind==="gemini" ? null : (models[id]||list[0]));
+    if(P[id].kind==="gemini"){
+      reply = await geminiOnce(key, models.gemini||pickGemini(await geminiList(key)), [{role:"user",content:"Sirf likho: OK"}]);
+      lastModel = models.gemini||"";
+    }else{
+      reply = await openaiOnce(id, m, [{role:"user",content:"Sirf likho: OK"}]);
+      lastModel = m;
+    }
+    line(true, "Chat call: “"+String(reply).trim().slice(0,40)+"” (model: "+lastModel+")");
+    health[id]="ok"; saveKeys(); paintKeys();
+  }catch(e){ line(false, "Chat call fail: "+e.message); health[id]="bad"; saveKeys(); paintKeys(); }
+  draw("info");
+
+  // 4. memory
+  try{
+    localStorage.setItem("seetal-selftest","1");
+    const ok = localStorage.getItem("seetal-selftest")==="1";
+    localStorage.removeItem("seetal-selftest");
+    line(ok, "Memory (notes) kaam kar rahi hai");
+  }catch(e){ line(false, "Memory band hai — browser private mode me hoga"); }
+
+  const allOk = !rows.join("").includes('color:var(--red)');
+  draw(allOk?"ok":"bad");
+  if(allOk) rows.unshift('<div style="margin-bottom:4px"><b>Sab theek:</b> key, models, chat aur memory — sab asli test me pass.</div>');
+}
+document.getElementById("selfcheck").onclick=selfTest;
+
+paintKeys();
+if(!ORDER.some(id=>keys[id]) && keyEl.focus) keyEl.focus();
+if(ORDER.some(id=>keys[id])){ setBar(testMsg,"info","Save ki hui key check ho rahi hai…"); setTimeout(refreshModels, 300); }
+</script>
+</body>
+</html>
