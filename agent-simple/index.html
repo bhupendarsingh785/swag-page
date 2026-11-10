@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seetal Agent — simple</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#fdf8f2; --surface:#ffffff; --line:#e6dbcd; --line2:#cbb9a4;
+  --text:#2a211b; --dim:#8a7768; --green:#2f7d32; --green-bg:#e8f3e6;
+  --red:#b3261e; --red-bg:#fdeceb; --blue:#1c5f8a; --amber:#a86a00;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#1a1613;--surface:#241f1b;--line:#3a322b;--line2:#4d4239;--text:#f4ece3;--dim:#a3927f;
+    --green:#8fce8b;--green-bg:#1f2e1e;--red:#f2a09b;--red-bg:#33201e;--blue:#8dc4e8;--amber:#e0b062;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;font-size:17px;line-height:1.55}
+.wrap{max-width:640px;margin:0 auto;padding:26px 18px 60px}
+h1{font-size:26px;margin:0 0 4px;font-weight:800;letter-spacing:-.01em}
+.sub{color:var(--dim);font-size:15px;margin-bottom:26px}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+.step h2{font-size:16px;margin:0 0 12px;font-weight:800;display:flex;align-items:center;gap:10px}
+.num{width:26px;height:26px;border-radius:50%;background:var(--text);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex:none}
+input,textarea{width:100%;padding:14px;font-size:17px;font-family:inherit;border:2px solid var(--line2);border-radius:10px;
+  background:var(--bg);color:var(--text);outline:none}
+input:focus,textarea:focus{border-color:var(--blue)}
+textarea{min-height:90px;resize:vertical}
+button{width:100%;margin-top:12px;padding:15px;font-size:17px;font-weight:800;font-family:inherit;border:none;border-radius:10px;
+  background:var(--text);color:var(--bg);cursor:pointer;transition:.15s}
+button:hover:not(:disabled){opacity:.88}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.green{background:var(--green);color:#fff}
+.msg{margin-top:14px;padding:13px 15px;border-radius:10px;font-size:15.5px;display:none;white-space:pre-wrap}
+.msg.show{display:block}
+.msg.ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green)}
+.msg.bad{background:var(--red-bg);color:var(--red);border:1px solid var(--red)}
+.msg.info{background:var(--surface);border:1px dashed var(--line2);color:var(--dim)}
+.out{margin-top:16px}
+.out .b{padding:13px 15px;border-radius:10px;margin-bottom:9px;font-size:16px;white-space:pre-wrap;overflow-wrap:anywhere}
+.out .u{background:var(--blue);color:#fff}
+.out .a{background:var(--surface);border:1px solid var(--line)}
+.out .t{font-family:"Azeret Mono",monospace;font-size:12.5px;background:var(--bg);border:1px dashed var(--line2);color:var(--dim)}
+.link{color:var(--blue);font-size:14px;word-break:break-all}
+.foot{color:var(--dim);font-size:13px;margin-top:26px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Seetal Agent</h1>
+  <div class="sub">Bas teen kaam — key paste karo, test karo, phir kaam likho.</div>
+
+  <div class="step">
+    <h2><span class="num">1</span> API key yahan paste karo</h2>
+    <input id="key" type="password" placeholder="Gemini ki key (AQ. ya AIza se shuru) paste karo…" autocomplete="off" spellcheck="false">
+    <button id="test">Key test karo</button>
+    <div class="msg" id="testMsg"></div>
+  </div>
+
+  <div class="step">
+    <h2><span class="num">2</span> Kya karna hai — likho</h2>
+    <textarea id="goal" placeholder="jaise: Reliance ka aaj ka price lao aur note me save karo"></textarea>
+    <button class="green" id="run" disabled>Chalao</button>
+    <div class="msg info show" id="hint">Pehle key test karo — phir yeh button chalu ho jayega.</div>
+  </div>
+
+  <div class="out" id="out"></div>
+
+  <div class="foot">
+    Key sirf isi phone/browser me save hoti hai — kahin bhejti nahi. Test ke baad AI Studio se key delete karke nayi bana lena achhi aadat hai.
+  </div>
+</div>
+
+<script>
+const LS="seetal-simple-v1";
+let st={key:"",model:""};
+try{ Object.assign(st, JSON.parse(localStorage.getItem(LS)||"{}")); }catch(e){}
+const save=()=>{ try{ localStorage.setItem(LS, JSON.stringify(st)); }catch(e){} };
+
+const keyEl=document.getElementById("key"), testMsg=document.getElementById("testMsg");
+const runBtn=document.getElementById("run"), goalEl=document.getElementById("goal"), outEl=document.getElementById("out");
+keyEl.value=st.key||"";
+
+function show(el,cls,text){ el.className="msg show "+cls; el.textContent=text; }
+
+// key se provider pehchano
+function detect(k){
+  k=(k||"").trim();
+  if(k.startsWith("gsk_")) return {id:"groq",name:"Groq",kind:"openai",base:"https://api.groq.com/openai/v1",model:"llama-3.3-70b-versatile"};
+  if(k.startsWith("sk-or-")) return {id:"openrouter",name:"OpenRouter",kind:"openai",base:"https://openrouter.ai/api/v1",model:"meta-llama/llama-3.3-70b-instruct:free"};
+  if(k.startsWith("csk-")) return {id:"cerebras",name:"Cerebras",kind:"openai",base:"https://api.cerebras.ai/v1",model:"llama-3.3-70b"};
+  return {id:"gemini",name:"Google Gemini",kind:"gemini",base:"https://generativelanguage.googleapis.com/v1beta",model:st.model||"gemini-2.0-flash"};
+}
+
+const POLICY=`Tum Seetal Agent ho — Swag ki madad karne wali chhoti agent.
+Sirf JSON me jawab do, koi extra text nahi:
+{"thought":"chhota soch","tool":"tool_name","args":{...}}  ya kaam poora hone par {"final":"Hinglish me saaf jawab"}.
+Ek baar me ek tool. Sirf diye gaye tools use karo. Data jhooth mat banao — tool fail ho to saaf bolo.
+Jawab Hinglish me, chhota aur seedha.`;
+
+const TOOLS=[["time_now","{}","aaj ki date aur time"],["calc",'{"expr":"..."}',"ganit"],["wiki",'{"q":"..."}',"Wikipedia search"],
+ ["quote",'{"symbol":"..."}',"Yahoo price"],["note_save",'{"key":"...","value":"..."}',"note rakho"],["notes_list","{}","notes dikhao"]];
+
+async function callModel(messages, key){
+  const p=detect(key);
+  if(p.kind==="gemini"){
+    const contents=messages.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]}));
+    const r=await fetch(`${p.base}/models/${encodeURIComponent(p.model)}:generateContent`,{
+      method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
+      body:JSON.stringify({systemInstruction:{parts:[{text:POLICY}]},contents,generationConfig:{temperature:0.3,maxOutputTokens:800}})});
+    if(!r.ok) throw new Error("HTTP "+r.status+" — "+(await r.text()).slice(0,140));
+    const j=await r.json();
+    const c=j.candidates&&j.candidates[0];
+    return {text:(c&&c.content&&c.content.parts||[]).map(x=>x.text||"").join(""),p};
+  }
+  const r=await fetch(p.base+"/chat/completions",{
+    method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+    body:JSON.stringify({model:p.model,temperature:0.3,max_tokens:800,
+      messages:[{role:"system",content:POLICY},...messages]})});
+  if(!r.ok) throw new Error("HTTP "+r.status+" — "+(await r.text()).slice(0,140));
+  const j=await r.json();
+  return {text:(j.choices&&j.choices[0]&&j.choices[0].message.content)||"",p};
+}
+
+document.getElementById("test").onclick=async()=>{
+  const k=keyEl.value.trim();
+  if(!k){ show(testMsg,"bad","Pehle key paste karo."); return; }
+  show(testMsg,"info","Test ho raha hai…");
+  try{
+    const {text,p}=await callModel([{role:"user",content:"Sirf ek line likho: OK"}],k);
+    if(!String(text).trim()) throw new Error("jawab khaali aaya");
+    st.key=k; save();
+    show(testMsg,"ok","Chalu hai ✓  ("+p.name+" — "+p.model+")\nAb neeche kaam likho.");
+    runBtn.disabled=false;
+    document.getElementById("hint").classList.remove("show");
+  }catch(e){
+    show(testMsg,"bad","Nahi chala: "+e.message+"\nKey dobara copy karo, ya AI Studio se nayi key banao.");
+    runBtn.disabled=true;
+  }
+};
+
+function parseJSON(t){
+  t=String(t||"").trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+  const a=t.indexOf("{"),b=t.lastIndexOf("}");
+  if(a>=0&&b>a) t=t.slice(a,b+1);
+  return JSON.parse(t);
+}
+
+async function runTool(name,args){
+  args=args||{};
+  if(name==="time_now"){const n=new Date();return {ist:n.toLocaleString("en-IN",{timeZone:"Asia/Kolkata"}),day:n.toLocaleDateString("en-IN",{weekday:"long",timeZone:"Asia/Kolkata"})};}
+  if(name==="calc"){const e=String(args.expr||"").replace(/[^0-9+\-*/%.() ]/g,"");if(!e)throw new Error("expr khaali");
+    const v=Function('"use strict";return ('+e+')')();if(typeof v!=="number"||!isFinite(v))throw new Error("number nahi bana");return {expr:e,value:v};}
+  if(name==="wiki"){const r=await fetch("https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch="+encodeURIComponent(args.q||"")+"&format=json&origin=*&srlimit=3");
+    const j=await r.json();const h=(j.query&&j.query.search||[]).map(s=>({title:s.title,snippet:String(s.snippet).replace(/<[^>]+>/g,"")}));
+    if(!h.length)throw new Error("kuch nahi mila");return h;}
+  if(name==="quote"){const s=String(args.symbol||"").trim();if(!s)throw new Error("symbol khaali");
+    const u="https://query1.finance.yahoo.com/v8/finance/chart/"+encodeURIComponent(s)+"?range=1d&interval=5m";
+    const r=await fetch("https://api.allorigins.win/raw?url="+encodeURIComponent(u));const j=await r.json();
+    const m=j.chart&&j.chart.result&&j.chart.result[0];if(!m)throw new Error("Yahoo se data nahi aaya");
+    return {symbol:s,price:m.meta.regularMarketPrice,prev:m.meta.chartPreviousClose,currency:m.meta.currency};}
+  if(name==="note_save"){const k=String(args.key||"").slice(0,60);if(!k)throw new Error("key khaali");
+    st["n_"+k]=String(args.value||"").slice(0,1000);save();return {saved:k};}
+  if(name==="notes_list"){return Object.keys(st).filter(x=>x.startsWith("n_")).map(x=>({key:x.slice(2),value:String(st[x]).slice(0,100)}));}
+  throw new Error("aisa tool nahi hai: "+name);
+}
+
+function bub(cls,text){
+  const d=document.createElement("div");d.className="b "+cls;d.textContent=text;
+  outEl.appendChild(d);
+  if(d.scrollIntoView) d.scrollIntoView({behavior:"smooth",block:"nearest"});
+  return d;
+}
+
+runBtn.onclick=async()=>{
+  const goal=goalEl.value.trim(); if(!goal) return;
+  const key=keyEl.value.trim(); if(!key){ show(testMsg,"bad","Pehle key paste karo."); return; }
+  outEl.innerHTML=""; runBtn.disabled=true; runBtn.textContent="Chal raha hai…";
+  bub("u",goal);
+  const messages=[{role:"user",content:"Kaam: "+goal+"\n\nTools: "+TOOLS.map(t=>t[0]+"("+t[1]+")").join(", ")+"\n\nSirf JSON me jawab do."}];
+  for(let i=0;i<8;i++){
+    let raw;
+    try{ const {text}=await callModel(messages,key); raw=text; }
+    catch(e){ bub("a","Error: "+e.message); break; }
+    let obj;
+    try{ obj=parseJSON(raw); }catch(e){ bub("a",raw.trim()); messages.push({role:"assistant",content:raw},{role:"user",content:'Sirf JSON do: {"final":"..."} ya {"tool":"...","args":{...}}'}); continue; }
+    if(obj.final){ bub("a",obj.final); break; }
+    if(!obj.tool){ messages.push({role:"assistant",content:raw},{role:"user",content:"tool ya final do — JSON me."}); continue; }
+    const tb=bub("t","▶ "+obj.tool+"  "+JSON.stringify(obj.args||{}));
+    let res,ok=true;
+    try{ res=await runTool(obj.tool,obj.args); }catch(e){ ok=false; res={error:e.message}; }
+    tb.textContent+="\n"+(ok?"✓ ":"✗ ")+JSON.stringify(res).slice(0,300);
+    messages.push({role:"assistant",content:raw},{role:"user",content:"TOOL RESULT ("+obj.tool+"): "+JSON.stringify(res).slice(0,1500)+"\n\nAgla step JSON me."});
+  }
+  runBtn.disabled=false; runBtn.textContent="Chalao";
+};
+</script>
+</body>
+</html>
