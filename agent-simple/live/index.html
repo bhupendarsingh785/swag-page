@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Seetal Agent — v8 (multi-task + app banata hai)</title>
+<title>Seetal Agent — v9 (Groq ke reasoning models ke saath)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -91,7 +91,7 @@ textarea:focus{border-color:var(--blue)}
 </head>
 <body>
 <div class="wrap">
-  <h1>Seetal Agent <span style="font-size:13px;color:var(--dim);font-family:'Azeret Mono',monospace">v8</span></h1>
+  <h1>Seetal Agent <span style="font-size:13px;color:var(--dim);font-family:'Azeret Mono',monospace">v9</span></h1>
   <div class="sub">Bas ek jagah key daalni hai — neeche hari dashed line wale box me.</div>
 
   <div class="pointer">
@@ -135,7 +135,7 @@ textarea:focus{border-color:var(--blue)}
   <div class="out" id="out"></div>
 
   <div class="foot">
-    Keys isi browser me save hoti hain — naya version kholne par bhi bachi rehti hain. Purana version: <a href="../v7/">v7</a>, <a href="../v6/">v6</a>, <a href="../v5/">v5</a>.
+    Keys isi browser me save hoti hain — naya version kholne par bhi bachi rehti hain. Purana version: <a href="../v8/">v8</a>, <a href="../v7/">v7</a>, <a href="../v6/">v6</a>.
   </div>
 </div>
 
@@ -213,7 +213,7 @@ let lastModel="";
 
 /* kaam karne wale models — pehle yahi try hote hain, random model kabhi nahi */
 const CURATED={
-  groq:["llama-3.3-70b-versatile","llama-3.1-8b-instant","openai/gpt-oss-20b"],
+  groq:["qwen/qwen3.8-27b","openai/gpt-oss-120b","openai/gpt-oss-20b","allam-2-7b"],
   openrouter:["meta-llama/llama-3.3-70b-instruct:free","deepseek/deepseek-chat-v3-0324:free","google/gemini-2.0-flash-exp:free","mistralai/mistral-7b-instruct:free","qwen/qwen-2.5-72b-instruct:free"],
   cerebras:["llama-3.3-70b","llama3.1-8b"],
   mistral:["mistral-small-latest","open-mistral-nemo"]
@@ -263,7 +263,7 @@ async function geminiOnce(key, model, messages){
   const contents=messages.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]}));
   const r=await fetch(`${P.gemini.base}/models/${encodeURIComponent(model)}:generateContent`,{
     method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
-    body:JSON.stringify({systemInstruction:{parts:[{text:POLICY}]},contents,generationConfig:{temperature:0.3,maxOutputTokens:800}})});
+    body:JSON.stringify({systemInstruction:{parts:[{text:POLICY}]},contents,generationConfig:{temperature:0.3,maxOutputTokens:1800}})});
   if(!r.ok){
     const body=await r.text();
     const err=new Error("HTTP "+r.status+" — "+body.slice(0,140));
@@ -275,14 +275,20 @@ async function geminiOnce(key, model, messages){
 async function openaiOnce(id, model, messages){
   const r=await fetch(P[id].base+"/chat/completions",{
     method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+keys[id]},
-    body:JSON.stringify({model,temperature:0.3,max_tokens:800,messages:[{role:"system",content:POLICY},...messages]})});
+    body:JSON.stringify({model,temperature:0.3,max_tokens:1800,messages:[{role:"system",content:POLICY},...messages]})});
   if(!r.ok){
     const body=await r.text();
     const err=new Error("HTTP "+r.status+" — "+body.slice(0,140));
     err.status=r.status; throw err;
   }
   const j=await r.json();
-  return (j.choices&&j.choices[0]&&j.choices[0].message.content)||"";
+  const ch=(j.choices&&j.choices[0])||{};
+  const txt=(ch.message&&ch.message.content)||"";
+  if(!String(txt).trim()){
+    const err=new Error("jawab khaali aaya (reasoning model) — "+(ch.finish_reason||"?"));
+    err.status=422; throw err;
+  }
+  return txt;
 }
 
 /* model purana ho gaya to list se naya chuno aur ek baar dobara try */
