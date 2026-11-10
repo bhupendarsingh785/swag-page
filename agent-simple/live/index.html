@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Seetal Agent — v9 (Groq ke reasoning models ke saath)</title>
+<title>Seetal Agent — v10 (khud check karta hai — saaf sach)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -91,7 +91,7 @@ textarea:focus{border-color:var(--blue)}
 </head>
 <body>
 <div class="wrap">
-  <h1>Seetal Agent <span style="font-size:13px;color:var(--dim);font-family:'Azeret Mono',monospace">v9</span></h1>
+  <h1>Seetal Agent <span style="font-size:13px;color:var(--dim);font-family:'Azeret Mono',monospace">v10</span></h1>
   <div class="sub">Bas ek jagah key daalni hai — neeche hari dashed line wale box me.</div>
 
   <div class="pointer">
@@ -111,6 +111,7 @@ textarea:focus{border-color:var(--blue)}
       <button id="loadModels" style="width:auto;margin:0;padding:10px 12px;font-size:12.5px">models laao</button>
     </div>
     <button id="test">Save karo aur test karo</button>
+    <button id="selfcheck" style="background:transparent;border:2px solid var(--green);color:var(--green)">khud check karo (self-test)</button>
     <div class="bar info show" id="idle"><span class="dots"><i></i><i></i><i></i></span> intezaar — key paste hone ka</div>
     <div class="bar" id="testMsg"></div>
 
@@ -135,7 +136,7 @@ textarea:focus{border-color:var(--blue)}
   <div class="out" id="out"></div>
 
   <div class="foot">
-    Keys isi browser me save hoti hain — naya version kholne par bhi bachi rehti hain. Purana version: <a href="../v8/">v8</a>, <a href="../v7/">v7</a>, <a href="../v6/">v6</a>.
+    Keys isi browser me save hoti hain — naya version kholne par bhi bachi rehti hain. Purana version: <a href="../v9/">v9</a>, <a href="../v8/">v8</a>, <a href="../v7/">v7</a>.
   </div>
 </div>
 
@@ -529,7 +530,10 @@ async function refreshModels(){
     else list=chatModels(id, await openaiList(id)).slice(0,40);
     fillSel(list, models[id]||models.gemini||"");
     setBar(testMsg,"ok","Model chuno neeche wali list se — free tier wala model chuno. ("+list.length+" mile)");
-  }catch(e){ setBar(testMsg,"bad","Models nahi mile: "+e.message); }
+  }catch(e){
+    if(String(e.message).includes("401")) setBar(testMsg,"bad","Save ki hui key Groq/Google ne reject kar di (401). Neeche wale box me key dobara paste karo — poori, bina space.");
+    else setBar(testMsg,"bad","Models nahi mile: "+e.message);
+  }
 }
 document.getElementById("loadModels").onclick=refreshModels;
 sel.onchange=()=>{
@@ -551,9 +555,65 @@ function friendly(e){
   return m;
 }
 
+
+/* ---- self test: har cheez asli API se jaanchta hai, andaza nahi ---- */
+async function selfTest(){
+  const id=ORDER.find(x=>keys[x]);
+  if(!id){ setBar(testMsg,"bad","Koi key save nahi hai — pehle paste karo."); return; }
+  const key=keys[id];
+  const rows=[];
+  const line=(ok,txt)=>rows.push('<div style="display:flex;gap:8px;align-items:flex-start;margin-top:4px"><b style="color:'+(ok?'var(--green)':'var(--red)')+'">'+(ok?'✓':'✗')+'</b><span>'+esc(txt)+'</span></div>');
+  const draw=(cls)=>setBar(testMsg,cls,rows.join(""));
+
+  setBar(testMsg,"info",dots()+" check chal raha hai — asli API se…");
+  await new Promise(r=>setTimeout(r,50));
+
+  // 1. key ka format
+  const fmt = P[id].kind==="gemini" ? /^(AQ|AIza)/.test(key) : /^gsk_|^sk-or-|^csk-/.test(key);
+  line(fmt, "Key ka format: "+(fmt?"theek":"yeh "+P[id].name+" ki key jaisi nahi lagti")+" ("+key.slice(0,4)+"…)");
+  draw("info");
+
+  // 2. models list
+  let list=[];
+  try{
+    list = P[id].kind==="gemini" ? await geminiList(key) : chatModels(id, await openaiList(id));
+    line(true, "Models list: "+list.length+" chat models mile");
+  }catch(e){ line(false, "Models list fail: "+e.message); }
+  draw("info");
+
+  // 3. asli chat call
+  let reply="";
+  try{
+    const m = (P[id].kind==="gemini" ? null : (models[id]||list[0]));
+    if(P[id].kind==="gemini"){
+      reply = await geminiOnce(key, models.gemini||pickGemini(await geminiList(key)), [{role:"user",content:"Sirf likho: OK"}]);
+      lastModel = models.gemini||"";
+    }else{
+      reply = await openaiOnce(id, m, [{role:"user",content:"Sirf likho: OK"}]);
+      lastModel = m;
+    }
+    line(true, "Chat call: “"+String(reply).trim().slice(0,40)+"” (model: "+lastModel+")");
+    health[id]="ok"; saveKeys(); paintKeys();
+  }catch(e){ line(false, "Chat call fail: "+e.message); health[id]="bad"; saveKeys(); paintKeys(); }
+  draw("info");
+
+  // 4. memory
+  try{
+    localStorage.setItem("seetal-selftest","1");
+    const ok = localStorage.getItem("seetal-selftest")==="1";
+    localStorage.removeItem("seetal-selftest");
+    line(ok, "Memory (notes) kaam kar rahi hai");
+  }catch(e){ line(false, "Memory band hai — browser private mode me hoga"); }
+
+  const allOk = !rows.join("").includes('color:var(--red)');
+  draw(allOk?"ok":"bad");
+  if(allOk) rows.unshift('<div style="margin-bottom:4px"><b>Sab theek:</b> key, models, chat aur memory — sab asli test me pass.</div>');
+}
+document.getElementById("selfcheck").onclick=selfTest;
+
 paintKeys();
 if(!ORDER.some(id=>keys[id]) && keyEl.focus) keyEl.focus();
-if(ORDER.some(id=>keys[id])) refreshModels();
+if(ORDER.some(id=>keys[id])){ setBar(testMsg,"info","Save ki hui key check ho rahi hai…"); setTimeout(refreshModels, 300); }
 </script>
 </body>
 </html>
