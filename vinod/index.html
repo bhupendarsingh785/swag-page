@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Vinod v5 — saaf samajh</title>
+<title>Agent Vinod v6 — key test</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -46,7 +46,7 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
 </head>
 <body>
 <div class="wrap">
-  <h1>Agent Vinod <span style="font-size:11px;color:var(--green);font-family:'Azeret Mono',monospace">v5 CLEAR</span></h1>
+  <h1>Agent Vinod <span style="font-size:11px;color:var(--green);font-family:'Azeret Mono',monospace">v6 TEST</span></h1>
   <div class="sub">Seetal ka worker — bada kaam karta hai, jhooth nahi bolta. Result ek "card" me deta hai jo Seetal ko wapas diya ja sakta hai.</div>
 
   <div class="card">
@@ -67,10 +67,12 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
       </div>
 
       <div class="prow" style="margin-top:10px">
+        <button id="testKeys" style="padding:8px 12px;font-size:12.5px;background:var(--green);color:#06170a">keys test karo</button>
         <button id="expKeys" style="padding:8px 12px;font-size:12.5px">keys ka backup lo</button>
         <button id="impKeys" style="padding:8px 12px;font-size:12.5px">backup wapas lao</button>
         <input id="impFile" type="file" accept=".json" style="display:none">
       </div>
+      <div class="msg" id="testMsg" style="margin-top:8px"></div>
       <div class="msg info show" style="margin-top:8px">Keys isi browser me hamesha ke liye rehti hain — refresh, naya version, ya doosri app kholne par bhi milengi. Ek baar backup file le lo, phir browser data saaf karne par bhi kuch nahi jayega.</div>
     </details>
   </div>
@@ -448,6 +450,30 @@ document.getElementById("taskAdd").onclick=()=>{
   document.getElementById("taskNew").value=""; paintTasks();
 };
 paintTasks();
+
+document.getElementById("testKeys").onclick=async()=>{
+  const el=document.getElementById("testMsg");
+  const list=allProviders().filter(p=>keys[p.id]);
+  if(!list.length){ el.className="msg show bad"; el.textContent="Koi key save nahi hai — pehle ek key paste karo."; return; }
+  el.className="msg show info"; el.textContent="Test ho raha hai… ("+list.length+" keys)";
+  const lines=[];
+  for(const p of list){
+    const t0=performance.now();
+    try{
+      const txt=await callProvider(p,[{role:"user",content:"Sirf ek shabd likho: OK"}]);
+      const ms=Math.round(performance.now()-t0);
+      const ok=String(txt).trim().length>0;
+      health[p.id]=ok?"ok":"bad"; save(); paint();
+      lines.push((ok?"✓ ":"✗ ")+p.name+" — "+ms+"ms"+(ok?" — "+(models[p.id]||p.model||""):""));
+    }catch(e){
+      health[p.id]="bad"; save(); paint();
+      lines.push("✗ "+p.name+" — "+String(e.message).slice(0,70));
+    }
+  }
+  el.className="msg show "+(lines.every(l=>l.startsWith("✓"))?"ok":"bad");
+  el.textContent=lines.join("\n");
+  paintMap();
+};
 
 document.getElementById("expKeys").onclick=()=>{
   const data=JSON.stringify({keys,models,health,custom,tasks},null,2);
