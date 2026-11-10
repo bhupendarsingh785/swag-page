@@ -1,0 +1,42 @@
+{
+ "lines": [
+  {
+   "i": 0,
+   "file": "sounds/voices/line_000.mp3",
+   "lang": "hi",
+   "speaker": "Boy",
+   "text": "मैं जंगल से बहुत डरता हूँ",
+   "voice": "hi-IN-MadhurNeural",
+   "engine": "edge-tts"
+  },
+  {
+   "i": 1,
+   "file": "sounds/voices/line_001.mp3",
+   "lang": "hi",
+   "speaker": "Narrator",
+   "text": "अचानक एक गुफा दिखी, वहाँ रोशनी थी",
+   "voice": "hi-IN-SwaraNeural",
+   "engine": "edge-tts"
+  },
+  {
+   "i": 2,
+   "file": "sounds/voices/line_002.mp3",
+   "lang": "bn",
+   "speaker": "Girl",
+   "text": "নমস্কার, এখানে একটি গুহা আছে",
+   "voice": "bn-IN-TanishaaNeural",
+   "engine": "edge-tts"
+  },
+  {
+   "i": 3,
+   "file": "sounds/voices/line_003.mp3",
+   "lang": "hi",
+   "speaker": "Man",
+   "text": "अब हम दोनों दोस्त हैं",
+   "voice": "hi-IN-MadhurNeural",
+   "engine": "edge-tts"
+  }
+ ],
+ "count": 4,
+ "failed": 0
+}
