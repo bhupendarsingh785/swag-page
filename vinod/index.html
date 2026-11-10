@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Vinod — Seetal ka worker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d1014;--surface:#161b21;--surface2:#1f262e;--line:#2b343d;--text:#e9eef4;--dim:#8fa0b2;
+ --green:#4caf50;--green-bg:#12241a;--red:#e57373;--blue:#64b5f6;--amber:#e0a44a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;font-size:15px;line-height:1.5}
+.wrap{max-width:760px;margin:0 auto;padding:16px 15px 70px}
+h1{font-size:22px;margin:0 0 3px;font-weight:800}
+.sub{color:var(--dim);font-size:13.5px;margin-bottom:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:12px}
+label{font-family:"Azeret Mono",monospace;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:5px}
+input,select,textarea{width:100%;padding:10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-family:inherit;font-size:14px}
+textarea{min-height:96px;resize:vertical}
+button{font-family:inherit;font-size:14px;font-weight:700;padding:12px 15px;border-radius:10px;border:none;background:var(--surface2);color:var(--text);cursor:pointer}
+button:hover:not(:disabled){background:var(--line)}
+button:disabled{opacity:.45}
+button.go{background:var(--green);color:#06170a;width:100%;margin-top:10px;font-size:15.5px;padding:14px}
+.msg{margin-top:10px;padding:10px 12px;border-radius:9px;font-size:13.5px;display:none;white-space:pre-wrap}
+.msg.show{display:block}
+.msg.ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green)}
+.msg.bad{background:#2a1414;color:var(--red);border:1px solid var(--red)}
+.msg.info{background:var(--surface2);color:var(--dim);border:1px dashed var(--line)}
+.prov{display:grid;grid-template-columns:1fr;gap:8px}
+.prow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.prow .nm{font-family:"Azeret Mono",monospace;font-size:11px;width:78px;color:var(--dim)}
+.prow input{flex:1;min-width:130px;font-family:"Azeret Mono",monospace;font-size:11.5px}
+.prow .st{font-family:"Azeret Mono",monospace;font-size:10px;width:56px;text-align:right;color:var(--dim)}
+.prow .st.ok{color:var(--green)} .prow .st.bad{color:var(--red)}
+details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11px;letter-spacing:.06em;color:var(--dim)}
+.out{margin-top:12px}
+.b{padding:11px 13px;border-radius:10px;margin-bottom:8px;font-size:14.5px;white-space:pre-wrap;overflow-wrap:anywhere}
+.b.u{background:rgba(100,181,246,.14);border:1px solid rgba(100,181,246,.35)}
+.b.a{background:var(--surface);border:1px solid var(--line)}
+.b.t{font-family:"Azeret Mono",monospace;font-size:12px;background:var(--bg);border:1px dashed var(--line);color:var(--dim)}
+.card-out{background:var(--bg);border:1px solid var(--green);border-radius:10px;padding:12px;margin-top:10px;
+ font-family:"Azeret Mono",monospace;font-size:11.5px;white-space:pre-wrap;color:var(--text)}
+.foot{color:var(--dim);font-size:12.5px;margin-top:16px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Agent Vinod</h1>
+  <div class="sub">Seetal ka worker — bada kaam karta hai, jhooth nahi bolta. Result ek "card" me deta hai jo Seetal ko wapas diya ja sakta hai.</div>
+
+  <div class="card">
+    <details>
+      <summary>MODELS &amp; KEYS (ek baar bharo — sirf isi browser me rehti hain)</summary>
+      <div class="prov" id="prov" style="margin-top:10px"></div>
+      <div class="msg info show" style="margin-top:8px">Ek bhi key daalo to kaam shuru ho jayega. Jo key fail hogi, agla model apne aap try hoga.</div>
+    </details>
+  </div>
+
+  <div class="card">
+    <label>Kaam (Seetal ka brief)</label>
+    <textarea id="task" placeholder="Kaam: jungle wali kahani ka 6-shot plan banao&#10;Platform: web&#10;Kab tak: aaj"></textarea>
+    <div class="prow" style="margin-top:9px">
+      <div style="flex:1;min-width:120px"><label>Mode</label>
+        <select id="mode">
+          <option value="plan">Plan / script / text</option>
+          <option value="code">Code likho (single file)</option>
+          <option value="fix">Bug fix / review</option>
+          <option value="research">Research + summary</option>
+        </select></div>
+      <div style="flex:1;min-width:120px"><label>Model</label>
+        <select id="modelSel"><option value="">(apne aap)</option></select></div>
+    </div>
+    <button class="go" id="run">Kaam shuru karo</button>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div class="card">
+    <div class="out" id="out"></div>
+    <button id="copyCard" style="width:100%;display:none;background:var(--green);color:#06170a">Card copy karo (Seetal ko dene ke liye)</button>
+  </div>
+
+  <div class="foot">
+    Vinod ke paas tools: time, calc, fetch_text (allowlist), make_app (file banata hai), notes.
+    Woh apna kaam khud jaanchta nahi kar sakta — isliye card me "TESTED: kuch nahi" likhta hai; asli jaanch Seetal karti hai.
+  </div>
+</div>
+
+<script>
+const KSTORE="vinod-keys-v1";
+const PROVIDERS=[
+  {id:"groq",      name:"Groq",      kind:"openai", base:"https://api.groq.com/openai/v1",   model:"qwen/qwen3.8-27b"},
+  {id:"openai",    name:"OpenAI",    kind:"openai", base:"https://api.openai.com/v1",        model:"gpt-4o-mini"},
+  {id:"deepseek",  name:"DeepSeek",  kind:"openai", base:"https://api.deepseek.com/v1",      model:"deepseek-chat"},
+  {id:"kimi",      name:"Kimi",      kind:"openai", base:"https://api.moonshot.ai/v1",       model:"kimi-k2-0905-preview"},
+  {id:"openrouter",name:"OpenRouter",kind:"openai", base:"https://openrouter.ai/api/v1",     model:"meta-llama/llama-3.3-70b-instruct:free"},
+  {id:"gemini",    name:"Gemini",    kind:"gemini", base:"https://generativelanguage.googleapis.com/v1beta", model:""}
+];
+const TOOLS=[["time_now","{}","aaj ka time"],["calc",'{"expr":"2+2"}',"ganit"],
+ ["fetch_text",'{"url":"https://..."}',"allowlist se text"],["make_app",'{"name":"x.html","html":"..."}',"file banao"],
+ ["notes_list","{}","notes"]];
+const ALLOW=["raw.githubusercontent.com","en.wikipedia.org","api.github.com","data.gov.in"];
+
+let keys={}, health={}, models={}, lastCard="";
+try{ const s=JSON.parse(localStorage.getItem(KSTORE)||"{}"); keys=s.keys||{}; health=s.health||{}; models=s.models||{}; }catch(e){}
+const save=()=>{ try{ localStorage.setItem(KSTORE, JSON.stringify({keys,health,models})); }catch(e){} };
+
+const provEl=document.getElementById("prov"), msg=document.getElementById("msg"), outEl=document.getElementById("out");
+const taskEl=document.getElementById("task"), modeEl=document.getElementById("mode"), selEl=document.getElementById("modelSel");
+
+PROVIDERS.forEach(p=>{
+  const row=document.createElement("div"); row.className="prow";
+  row.innerHTML=`<span class="nm">${p.name}</span>
+    <input id="k-${p.id}" type="password" placeholder="API key" value="${(keys[p.id]||"").replace(/"/g,"&quot;")}">
+    <span class="st" id="s-${p.id}">—</span>`;
+  provEl.appendChild(row);
+  row.querySelector("#k-"+p.id).onchange=e=>{ keys[p.id]=e.target.value.trim(); save(); paint(); };
+});
+function paint(){
+  PROVIDERS.forEach(p=>{
+    const el=document.getElementById("s-"+p.id); if(!el) return;
+    const h=health[p.id];
+    el.textContent = keys[p.id] ? (h==="ok"?"chalu":h==="bad"?"fail":"key") : "—";
+    el.className="st "+(h==="ok"?"ok":h==="bad"?"bad":"");
+  });
+  const opts=PROVIDERS.filter(p=>keys[p.id]).map(p=>`<option value="${p.id}">${p.name}${models[p.id]?" · "+models[p.id]:""}</option>`).join("");
+  selEl.innerHTML='<option value="">(apne aap)</option>'+opts;
+}
+paint();
+
+function show(cls,txt){ msg.className="msg show "+cls; msg.textContent=txt; }
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+const SYSTEM=`Tum Vinod ho — Seetal ka worker agent. Kaam seedha, imandaar.
+Rules:
+1. Chhota aur saaf Hinglish me likho.
+2. Code maanga ho to POORA chalta hua single-file code do, placeholder nahi.
+3. Jo tumne test nahi kiya, "tested" mat likho — "test nahi kiya" likho.
+4. Jo samajh na aaye, bolo "yeh samajh nahi aaya" — andaza mat lagao.
+5. Aakhir me chhota summary: kya kiya, kya baaki hai.`;
+
+async function geminiModel(key){
+  if(models.gemini) return models.gemini;
+  const r=await fetch(PROVIDERS[5].base+"/models?pageSize=200",{headers:{"x-goog-api-key":key}});
+  if(!r.ok) throw new Error("gemini models "+r.status);
+  const j=await r.json();
+  const names=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent")).map(m=>String(m.name).replace(/^models\//,""));
+  const score=n=>{let v=0;if(/flash/i.test(n))v+=4;if(/latest/i.test(n))v+=2;if(/preview|exp|thinking|lite|image|tts|audio|embed/i.test(n))v-=4;const m=n.match(/(\d+(?:\.\d+)?)/);v+=m?Number(m[1]):0;return v;};
+  models.gemini=[...names].sort((a,b)=>score(b)-score(a))[0]; save();
+  return models.gemini;
+}
+
+async function callProvider(p, messages){
+  const key=keys[p.id];
+  if(p.kind==="gemini"){
+    const m=await geminiModel(key);
+    const contents=messages.filter(x=>x.role!=="system").map(x=>({role:x.role==="assistant"?"model":"user",parts:[{text:x.content}]}));
+    const r=await fetch(p.base+"/models/"+encodeURIComponent(m)+":generateContent",{
+      method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
+      body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents,generationConfig:{temperature:0.8,maxOutputTokens:3000}})});
+    if(!r.ok) throw new Error("HTTP "+r.status+" "+(await r.text()).slice(0,80));
+    const j=await r.json(); const c=j.candidates&&j.candidates[0];
+    return (c&&c.content&&c.content.parts||[]).map(x=>x.text||"").join("");
+  }
+  const r=await fetch(p.base+"/chat/completions",{
+    method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+    body:JSON.stringify({model:models[p.id]||p.model,temperature:0.8,max_tokens:3000,
+      messages:[{role:"system",content:SYSTEM},...messages]})});
+  if(!r.ok) throw new Error("HTTP "+r.status+" "+(await r.text()).slice(0,80));
+  const j=await r.json();
+  return (j.choices&&j.choices[0]&&j.choices[0].message.content)||"";
+}
+
+async function ask(messages){
+  const chosen=selEl.value;
+  const list=chosen?PROVIDERS.filter(p=>p.id===chosen&&keys[p.id]):PROVIDERS.filter(p=>keys[p.id]);
+  if(!list.length) throw new Error("koi key nahi hai — upar MODELS & KEYS me ek key daalo.");
+  let last=null;
+  for(const p of list){
+    try{
+      const txt=await callProvider(p,messages);
+      if(!String(txt).trim()) throw new Error("jawab khaali");
+      health[p.id]="ok"; save(); paint();
+      return {txt, by:p.name};
+    }catch(e){ health[p.id]="bad"; save(); paint(); last=e; }
+  }
+  throw new Error("saare model fail — "+(last?last.message:"?"));
+}
+
+function bub(cls,txt){ const d=document.createElement("div"); d.className="b "+cls; d.textContent=txt; outEl.appendChild(d); return d; }
+
+document.getElementById("run").onclick=async()=>{
+  const task=taskEl.value.trim();
+  if(!task){ show("bad","Pehle kaam likho."); return; }
+  const btn=document.getElementById("run"); btn.disabled=true; btn.textContent="Kaam ho raha hai…";
+  outEl.innerHTML=""; document.getElementById("copyCard").style.display="none";
+  bub("u",task);
+  const mode=modeEl.value;
+  const extra = mode==="code" ? "\nPoora chalta hua single-file code do (HTML/JS ya Python)."
+             : mode==="fix" ? "\nBug dhoondo, wajah batao, phir poora fix code do."
+             : mode==="research" ? "\nResearch karke 5-7 bullet me summary do, source ke naam ke saath."
+             : "\nPlan/steps me todo, phir output do.";
+  try{
+    const {txt, by} = await ask([{role:"user",content:task+extra}]);
+    bub("a", txt);
+    show("ok","Jawab aaya — "+by);
+    const codeMatch = txt.match(/```[a-zA-Z]*\n([\s\S]*?)```/);
+    lastCard = [
+      "TASK: "+task.split("\n")[0],
+      "BY: "+by,
+      "RESULT:",
+      txt.trim(),
+      codeMatch ? "\nCODE (alag kiya hua):\n"+codeMatch[1].trim() : "",
+      "\nTESTED: kuch nahi (Vinod khud nahi chala sakta)",
+      "NAHI HUA: jaanch baaki — Seetal chalakar dekhegi"
+    ].join("\n");
+    const box=document.createElement("div"); box.className="card-out"; box.textContent=lastCard;
+    outEl.appendChild(box);
+    document.getElementById("copyCard").style.display="block";
+  }catch(e){ show("bad", e.message); }
+  btn.disabled=false; btn.textContent="Kaam shuru karo";
+};
+
+document.getElementById("copyCard").onclick=async()=>{
+  try{ await navigator.clipboard.writeText(lastCard); show("ok","Card copy ho gaya — Seetal ko paste kar do."); }
+  catch(e){ prompt("Copy karo:", lastCard); }
+};
+</script>
+</body>
+</html>
