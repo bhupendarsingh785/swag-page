@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Seetal 3D Cartoon Studio V5 Hybrid: AI story planning, editable scenes, imported GLB characters and phone-side video rendering.">
-<title>Seetal 3D Cartoon Studio V7 — Auto Edition</title>
+<title>Seetal 3D Cartoon Studio V8 — Sound Edition</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -44,7 +44,7 @@ canvas{width:100%;height:100%;display:block}
 </head>
 <body>
 <div class="wrap">
-  <h1>Seetal 3D Cartoon Studio <span style="font-size:12px;color:var(--green);font-family:'Azeret Mono',monospace">V7 AUTO</span></h1>
+  <h1>Seetal 3D Cartoon Studio <span style="font-size:12px;color:var(--green);font-family:'Azeret Mono',monospace">V8 SOUND</span></h1>
   <div class="sub">Bas kahani likho aur ek button dabao — scene, character, camera, awaaz sab khud set hoga.</div>
 
   <div class="card">
@@ -87,6 +87,16 @@ canvas{width:100%;height:100%;display:block}
       <button id="loadProjectBtn" type="button">Load project JSON</button>
       <input id="loadProjectFile" type="file" accept=".json,application/json" hidden>
     </div>
+    <div class="v5-grid" style="margin-bottom:10px">
+      <div>
+        <label>Freesound API key (free — asli sound effects ke liye)</label>
+        <input id="fsKey" type="text" placeholder="freesound.org/apiv2/apply se key lo" spellcheck="false">
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button id="fsSave" type="button">Key save karo</button>
+      </div>
+    </div>
+    <div class="v5-note">Sound ka rasta: pehle <b>sounds/&lt;scene&gt;.mp3</b> (repo me tumhari file), phir <b>Freesound</b> (key ho to), phir apna bana hua ambience. Mixkit/Pixabay/ZapSplat/YouTube ki files manually download karke sounds/ folder me daal do — app unhe khud utha legi.</div>
     <div id="timeline" class="v5-timeline"><div class="v5-note">Pehle AI plan ya Demo plan banayein. Phir yahan har scene edit kar sakte hain.</div></div>
     <div class="v5-note">Har scene ka dialogue, subtitle, location, action aur camera edit kiya ja sakta hai.</div>
   </details>
@@ -105,6 +115,7 @@ canvas{width:100%;height:100%;display:block}
     <div id="dl"></div>
   </div>
 
+  <div id="credits" class="foot" style="color:var(--green)"></div>
   <div class="foot">
     Hybrid mode: 3D rendering phone/browser par hoti hai. AI scene planning internet aur saved API key par depend karti hai. Awaaz: har dialogue ki Hindi mp3 free TTS se aati hai (proxy ke raste). Record shuru hone se PEHLE saari awaazein download ho jaati hain, taaki video me beech me ruka hua frame na aaye. Music aur effects Web Audio se bante hain. Proxy fail ho to phone ki TTS chalti hai (woh recording me nahi jaati).
   </div>
@@ -412,7 +423,65 @@ function playBuffer(audio, rate){
   return src;
 }
 
-const sfx={bus:null,nodes:[],stepBuf:null};
+const sfx={bus:null,nodes:[],stepBuf:null, credits:[]};
+const SOUNDMAP={jungle:"jungle ambience birds",cave:"cave ambience water drip",night:"night crickets",river:"river water flowing"};
+const soundCache=new Map();
+
+function fsKey(){ try{ const k=JSON.parse(localStorage.getItem(KSTORE)||"{}").keys||{}; return k.freesound||""; }catch(e){ return ""; } }
+async function fetchBuf(url){
+  const tries=[url, "https://api.allorigins.win/raw?url="+encodeURIComponent(url)];
+  for(const u of tries){
+    try{ const r=await fetch(u); if(!r.ok) continue; const ab=await r.arrayBuffer(); if(ab.byteLength<1500) continue;
+      return await audioCtx().decodeAudioData(ab); }catch(e){}
+  }
+  return null;
+}
+async function loadSceneSound(kind){
+  if(soundCache.has(kind)) return soundCache.get(kind);
+  let out=null;
+  // 1) repo me rakhi file
+  out=await fetchBuf("sounds/"+kind+".mp3");
+  if(out){ out={buf:out, credit:"local sounds/"+kind+".mp3"}; }
+  // 2) Freesound (preview, bina OAuth)
+  if(!out){
+    const key=fsKey();
+    if(key){
+      try{
+        const q=encodeURIComponent(SOUNDMAP[kind]||kind);
+        const r=await fetch("https://freesound.org/apiv2/search/?query="+q+"&fields=id,name,previews,username,license&page_size=3&token="+encodeURIComponent(key));
+        if(r.ok){
+          const j=await r.json(); const s0=(j.results||[])[0];
+          const url=s0&&s0.previews&&(s0.previews["preview-hq-mp3"]||s0.previews["preview-lq-mp3"]);
+          if(url){
+            const buf=await fetchBuf(url);
+            if(buf) out={buf, credit:s0.name+" — "+s0.username+" (Freesound)"};
+          }
+        }
+      }catch(e){}
+    }
+  }
+  soundCache.set(kind,out);
+  return out;
+}
+async function startRealSound(kind){
+  const got=await loadSceneSound(kind);
+  if(!got) return false;
+  const ac=audioCtx();
+  const src=ac.createBufferSource(); src.buffer=got.buf; src.loop=true;
+  const g=ac.createGain(); g.gain.value=0.0;
+  src.connect(g); g.connect(ac.destination); if(audioDest) g.connect(audioDest);
+  g.gain.linearRampToValueAtTime(0.22, ac.currentTime+0.8);
+  src.start();
+  sfx.realGain=g; sfx.realSrc=src;
+  if(!sfx.credits.includes(got.credit)) sfx.credits.push(got.credit);
+  const cEl=document.getElementById("credits"); if(cEl) cEl.textContent="Sound: "+sfx.credits.slice(-3).join(" · ");
+  return true;
+}
+function stopRealSound(){
+  try{ if(sfx.realGain){ sfx.realGain.gain.linearRampToValueAtTime(0, audioCtx().currentTime+0.4); } }catch(e){}
+  const src=sfx.realSrc; sfx.realSrc=null; sfx.realGain=null;
+  if(src) setTimeout(()=>{ try{src.stop();}catch(e){} },500);
+}
 function makeNoise(ac,sec){
   const n=Math.floor(ac.sampleRate*sec), b=ac.createBuffer(1,n,ac.sampleRate), d=b.getChannelData(0);
   for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
@@ -420,6 +489,11 @@ function makeNoise(ac,sec){
 }
 function startAmbience(kind){
   const ac=audioCtx(); stopAmbience();
+  startRealSound(kind).then(ok=>{ if(!ok) proceduralAmbience(kind); });
+  return;
+}
+function proceduralAmbience(kind){
+  const ac=audioCtx();
   const bus=ac.createGain(); bus.gain.value=0;
   bus.connect(ac.destination); if(audioDest) bus.connect(audioDest);
   bus.gain.linearRampToValueAtTime(0.32,ac.currentTime+0.6);
@@ -438,6 +512,7 @@ function startAmbience(kind){
   src.connect(bp); bp.connect(wg); wg.connect(bus); src.start(); sfx.nodes.push(src);
 }
 function stopAmbience(){
+  stopRealSound();
   const nodes=sfx.nodes, bus=sfx.bus; sfx.nodes=[]; sfx.bus=null;
   if(!bus||!actx) return;
   try{ bus.gain.cancelScheduledValues(actx.currentTime); bus.gain.setValueAtTime(bus.gain.value,actx.currentTime); bus.gain.linearRampToValueAtTime(0,actx.currentTime+0.5); }catch(e){}
@@ -631,6 +706,19 @@ Sirf JSON: {"title":"...","shots":[...]}`);
 }
 
 /* ek button: plan → awaaz → record → download */
+{ const fk=document.getElementById("fsKey"), fsb=document.getElementById("fsSave");
+  if(fk){ try{ const st=JSON.parse(localStorage.getItem(KSTORE)||"{}"); fk.value=(st.keys&&st.keys.freesound)||""; }catch(e){} }
+  if(fsb) fsb.onclick=()=>{
+    try{
+      const st=JSON.parse(localStorage.getItem(KSTORE)||"{}");
+      st.keys=st.keys||{}; st.keys.freesound=fk.value.trim();
+      localStorage.setItem(KSTORE, JSON.stringify(st));
+      soundCache.clear();
+      show(msg1,"ok","Freesound key save ho gayi — ab scene ke hisaab se asli sound aayega.");
+    }catch(e){ show(msg1,"bad","Key save nahi hui: "+e.message); }
+  };
+}
+
 document.getElementById("auto").onclick=async()=>{
   const btn=document.getElementById("auto");
   if(running) return;
