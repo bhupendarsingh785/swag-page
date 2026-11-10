@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Vinod v7 — saaf error</title>
+<title>Agent Vinod v9 — asli diagnostic</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -46,7 +46,7 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
 </head>
 <body>
 <div class="wrap">
-  <h1>Agent Vinod <span style="font-size:11px;color:var(--green);font-family:'Azeret Mono',monospace">v7 SAAFI</span></h1>
+  <h1>Agent Vinod <span style="font-size:11px;color:var(--green);font-family:'Azeret Mono',monospace">v9 DIAG</span></h1>
   <div class="sub">Seetal ka worker — bada kaam karta hai, jhooth nahi bolta. Result ek "card" me deta hai jo Seetal ko wapas diya ja sakta hai.</div>
 
   <div class="card">
@@ -73,6 +73,7 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
         <input id="impFile" type="file" accept=".json" style="display:none">
       </div>
       <div class="msg" id="testMsg" style="margin-top:8px"></div>
+      <div id="diag" style="margin-top:8px"></div>
       <div class="msg info show" style="margin-top:8px">Keys isi browser me hamesha ke liye rehti hain — refresh, naya version, ya doosri app kholne par bhi milengi. Ek baar backup file le lo, phir browser data saaf karne par bhi kuch nahi jayega.</div>
     </details>
   </div>
@@ -177,8 +178,10 @@ function renderProvRows(){
     const hint = saved ? ("saved: ••••"+saved.slice(-4)+" (nayi key daalne par badal jayegi)") : "API key paste karo";
     row.innerHTML=`<span class="nm">${p.name}</span>
       <input id="k-${p.id}" type="password" placeholder="${esc(hint)}" value="">
-      <span class="st" id="s-${p.id}">—</span>`;
+      <span class="st" id="s-${p.id}">—</span>
+      <button data-test="${p.id}" style="padding:6px 9px;font-size:11px">test</button>`;
     provEl.appendChild(row);
+    row.querySelector("[data-test]").onclick=()=>testOne(p.id);
     row.querySelector("#k-"+p.id).onchange=e=>{
       const v=e.target.value.trim();
       if(v){ keys[p.id]=v; health[p.id]=undefined; save(); }
@@ -192,8 +195,8 @@ function paint(){
   prov.forEach(p=>{
     const el=document.getElementById("s-"+p.id); if(!el) return;
     const h=health[p.id];
-    el.textContent = keys[p.id] ? (h==="ok"?"chalu":h==="bad"?"fail":"saved ✓") : "—";
-    el.className="st "+(h==="ok"?"ok":h==="bad"?"bad":"");
+    el.textContent = keys[p.id] ? (h==="ok"?"chalu":h==="bad"?"fail":h==="cors"?"CORS":"saved ✓") : "—";
+    el.className="st "+(h==="ok"?"ok":h==="bad"?"bad":h==="cors"?"bad":"");
   });
   const opts=prov.filter(p=>keys[p.id]).map(p=>`<option value="${p.id}">${p.name}${models[p.id]?" · "+models[p.id]:""}</option>`).join("");
   selEl.innerHTML='<option value="">(apne aap)</option>'+opts;
@@ -214,7 +217,7 @@ Rules:
 
 async function geminiModel(key){
   if(models.gemini) return models.gemini;
-  const r=await fetch(PROVIDERS[5].base+"/models?pageSize=200",{headers:{"x-goog-api-key":key}});
+  const r=await safeFetch(PROVIDERS[5].base+"/models?pageSize=200",{headers:{"x-goog-api-key":key}});
   if(!r.ok) throw new Error("gemini models "+r.status);
   const j=await r.json();
   const names=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent")).map(m=>String(m.name).replace(/^models\//,""));
@@ -236,23 +239,28 @@ function explain(status, raw){
   return raw ? String(raw).slice(0,90) : "pata nahi kya hua";
 }
 
+async function safeFetch(url, opts){
+  try{ return await fetch(url, opts); }
+  catch(e){ const err=new Error("browser ne request rok di (CORS/network) — is provider ko server se hi call kiya ja sakta hai"); err.cors=true; throw err; }
+}
+
 async function callProvider(p, messages){
   const key=keys[p.id];
   if(p.kind==="gemini"){
     const m=await geminiModel(key);
     const contents=messages.filter(x=>x.role!=="system").map(x=>({role:x.role==="assistant"?"model":"user",parts:[{text:x.content}]}));
-    const r=await fetch(p.base+"/models/"+encodeURIComponent(m)+":generateContent",{
+    const r=await safeFetch(p.base+"/models/"+encodeURIComponent(m)+":generateContent",{
       method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
       body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents,generationConfig:{temperature:0.8,maxOutputTokens:3000}})});
-    if(!r.ok){ const raw=await r.text(); throw new Error(explain(r.status,raw)); }
+    if(!r.ok){ const raw=await r.text(); const er=new Error(explain(r.status,raw)); er.status=r.status; throw er; }
     const j=await r.json(); const c=j.candidates&&j.candidates[0];
     return (c&&c.content&&c.content.parts||[]).map(x=>x.text||"").join("");
   }
-  const r=await fetch(p.base+"/chat/completions",{
+  const r=await safeFetch(p.base+"/chat/completions",{
     method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
     body:JSON.stringify({model:models[p.id]||p.model,temperature:0.8,max_tokens:3000,
       messages:[{role:"system",content:SYSTEM},...messages]})});
-  if(!r.ok){ const raw=await r.text(); throw new Error(explain(r.status,raw)); }
+  if(!r.ok){ const raw=await r.text(); const er=new Error(explain(r.status,raw)); er.status=r.status; throw er; }
   const j=await r.json();
   return (j.choices&&j.choices[0]&&j.choices[0].message.content)||"";
 }
@@ -464,6 +472,43 @@ document.getElementById("taskAdd").onclick=()=>{
 };
 paintTasks();
 
+function diagRow(p, url, model, status, detail, ms){
+  const el=document.getElementById("diag");
+  const cls = status>=200&&status<300 ? "a" : "t";
+  const d=document.createElement("div"); d.className="b "+cls;
+  d.textContent=`${p.name} · ${status?("HTTP "+status):"no-response"} · ${ms}ms
+URL: ${url}
+model: ${model||"-"}
+${detail?("detail: "+detail):""}`;
+  el.prepend(d);
+}
+
+async function testOne(id){
+  const p=allProviders().find(x=>x.id===id); if(!p) return;
+  const el=document.getElementById("testMsg");
+  el.className="msg show info"; el.textContent=p.name+" test ho raha hai…";
+  const key=keys[p.id];
+  if(!key){ el.className="msg show bad"; el.textContent=p.name+" ki key save nahi hai."; return; }
+  const t0=performance.now();
+  const url = p.kind==="gemini"
+    ? p.base+"/models/"+(models.gemini||"<auto>")+":generateContent"
+    : p.base+"/chat/completions";
+  const model = models[p.id]||p.model||"";
+  try{
+    const txt=await callProvider(p,[{role:"user",content:"Sirf ek shabd likho: OK"}]);
+    const ms=Math.round(performance.now()-t0);
+    health[p.id]="ok"; save(); paint();
+    el.className="msg show ok"; el.textContent="✓ "+p.name+" chalu — "+ms+"ms — "+(model||"model auto");
+    diagRow(p,url,model,200,"jawab: "+String(txt).slice(0,40),ms);
+  }catch(e){
+    const ms=Math.round(performance.now()-t0);
+    const isCors=e.cors||/CORS|Failed to fetch/i.test(String(e.message));
+    health[p.id]=isCors?"cors":"bad"; save(); paint();
+    el.className="msg show bad"; el.textContent=(isCors?"⚠ ":"✗ ")+p.name+" — "+String(e.message).slice(0,120);
+    diagRow(p,url,model,e.status||(isCors?0:null),String(e.message).slice(0,160),ms);
+  }
+}
+
 document.getElementById("testKeys").onclick=async()=>{
   const el=document.getElementById("testMsg");
   const list=allProviders().filter(p=>keys[p.id]);
@@ -479,8 +524,9 @@ document.getElementById("testKeys").onclick=async()=>{
       health[p.id]=ok?"ok":"bad"; save(); paint();
       lines.push((ok?"✓ ":"✗ ")+p.name+" — "+ms+"ms"+(ok?" — "+(models[p.id]||p.model||""):""));
     }catch(e){
-      health[p.id]="bad"; save(); paint();
-      lines.push("✗ "+p.name+" — "+String(e.message).slice(0,110));
+      const isCors = e.cors || /CORS|Failed to fetch/i.test(String(e.message));
+      health[p.id] = isCors ? "cors" : "bad"; save(); paint();
+      lines.push((isCors?"⚠ ":"✗ ")+p.name+" — "+String(e.message).slice(0,110));
     }
   }
   el.className="msg show "+(lines.every(l=>l.startsWith("✓"))?"ok":"bad");
