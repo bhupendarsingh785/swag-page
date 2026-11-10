@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seetal 3D Cartoon Studio v5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--line:#30363d;--text:#e6edf3;--dim:#8b949e;
+ --green:#3fb950;--green-bg:#12261a;--red:#f85149;--amber:#d29922;--blue:#58a6ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;font-size:15px;line-height:1.5}
+.wrap{max-width:720px;margin:0 auto;padding:16px 16px 60px}
+h1{font-size:21px;margin:0 0 2px;font-weight:800}
+.sub{color:var(--dim);font-size:13.5px;margin-bottom:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+label{font-family:"Azeret Mono",monospace;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:6px}
+input,select,textarea{width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-family:inherit;font-size:14.5px}
+textarea{min-height:62px;resize:vertical}
+button{font-family:inherit;font-size:14px;font-weight:700;padding:12px 16px;border-radius:10px;border:none;background:var(--surface2);color:var(--text);cursor:pointer}
+button:hover:not(:disabled){background:var(--line)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.go{background:var(--green);color:#04170a;width:100%;margin-top:10px}
+.stage{background:#000;border-radius:12px;overflow:hidden;aspect-ratio:9/16;max-height:54vh;margin:0 auto;position:relative}
+canvas{width:100%;height:100%;display:block}
+#gl{position:absolute;left:-9999px;top:-9999px}
+.status{font-family:"Azeret Mono",monospace;font-size:10.5px;color:var(--dim);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap}
+.status b{color:var(--green)}
+.msg{margin-top:10px;padding:10px 12px;border-radius:9px;font-size:13.5px;display:none;white-space:pre-wrap}
+.msg.show{display:block}
+.msg.ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green)}
+.msg.bad{background:#2a1414;color:var(--red);border:1px solid var(--red)}
+.msg.info{background:var(--surface2);color:var(--dim);border:1px dashed var(--line)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.row button{flex:1;min-width:120px}
+.shots{margin-top:10px;font-size:12.5px;color:var(--dim);max-height:120px;overflow:auto}
+.shots div{padding:5px 0;border-bottom:1px dashed var(--line)}
+.foot{color:var(--dim);font-size:12.5px;margin-top:14px;line-height:1.6}
+#dl a{display:block;margin-top:10px;padding:12px;border-radius:10px;background:var(--blue);color:#04101f;font-weight:800;text-align:center;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Seetal 3D Cartoon <span style="font-size:12px;color:var(--dim);font-family:'Azeret Mono',monospace">v5</span></h1>
+  <div class="sub">Character code se bante hain (toon look + outline). Awaaz + music + effects, sab record me aate hain.</div>
+
+  <div class="card">
+    <label>Kahani</label>
+    <textarea id="topic">Ek ladka jungle se darta hai. Aage jaakar use ek gufa milti hai. Wahan ek ladki milti hai. Woh usse bachata hai aur dosti ho jaati hai.</textarea>
+    <div class="row">
+      <div style="flex:1;min-width:100px"><label>Shots</label>
+        <select id="nshots"><option>3</option><option selected>4</option><option>5</option></select></div>
+      <div style="flex:1;min-width:100px"><label>Kam se kam har shot</label>
+        <select id="secs"><option value="4000">4 sec</option><option value="5000" selected>5 sec</option><option value="6000">6 sec</option></select></div>
+    </div>
+    <button class="go" id="make">1. Scene plan banao (AI)</button>
+    <div class="row"><button id="demo">Demo plan (bina key ke)</button></div>
+    <div class="msg" id="msg1"></div>
+    <div class="shots" id="shots"></div>
+  </div>
+
+  <div class="card">
+    <div class="stage"><canvas id="stage" width="720" height="1280"></canvas><canvas id="gl" width="720" height="1280"></canvas></div>
+    <div class="status"><span>3D: <b id="st3d">—</b></span><span>Character: <b id="stchar">—</b></span><span>Awaaz: <b id="stvoice">—</b></span><span>AI: <b id="stai">—</b></span></div>
+    <div class="row">
+      <button id="play">2. Film chalao</button>
+      <button id="rec">3. Record + download</button>
+    </div>
+    <div class="msg" id="msg2"></div>
+    <div id="dl"></div>
+  </div>
+
+  <div class="foot">
+    Awaaz: har dialogue ki Hindi mp3 free TTS se aati hai (proxy ke raste). Record shuru hone se PEHLE saari awaazein download ho jaati hain, taaki video me beech me ruka hua frame na aaye. Music aur effects Web Audio se bante hain. Proxy fail ho to phone ki TTS chalti hai (woh recording me nahi jaati).
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const KSTORE="seetal-keys-v1";
+const GROQ={base:"https://api.groq.com/openai/v1", model:"qwen/qwen3.8-27b"};
+const stage=document.getElementById("stage"), ctx=stage.getContext("2d");
+const msg1=document.getElementById("msg1"), msg2=document.getElementById("msg2"), dlBox=document.getElementById("dl");
+const W=stage.width, H=stage.height;
+const st3d=document.getElementById("st3d"), stchar=document.getElementById("stchar"), stvoice=document.getElementById("stvoice"), stai=document.getElementById("stai");
+
+let renderer, scene, camera, sun;
+let world=[], people=[], shots=[], running=false;
+let recorder=null, chunks=[], blobUrl=null, actx=null, audioDest=null, currentAudio=null;
+let voiceOK=null;
+const voiceCache=new Map();
+
+function show(el,cls,txt){ el.className="msg show "+cls; el.textContent=txt; }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function key(){ try{ const s=JSON.parse(localStorage.getItem(KSTORE)||"{}"); return (s.keys&&(s.keys.groq||s.keys.openrouter))||""; }catch(e){ return ""; } }
+function parseJSON(t){
+  t=String(t||"").replace(/<think>[\s\S]*?<\/think>/gi,"").trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+  const a=t.indexOf("{"), b=t.lastIndexOf("}");
+  if(a>=0&&b>a) t=t.slice(a,b+1);
+  return JSON.parse(t);
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+/* ---------- 3D setup ---------- */
+function init3D(){
+  if(renderer) return true;
+  if(typeof THREE==="undefined"){ st3d.textContent="three.js load nahi hua"; st3d.style.color="var(--red)"; return false; }
+  try{
+    renderer=new THREE.WebGLRenderer({canvas:document.getElementById("gl"),antialias:true,preserveDrawingBuffer:true});
+  }catch(e){ st3d.textContent="WebGL band"; st3d.style.color="var(--red)"; return false; }
+  renderer.setSize(W,H,false); renderer.setPixelRatio(1);
+  renderer.shadowMap.enabled=true;
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(46,W/H,0.1,300);
+  camera.position.set(0,2.4,8.2); camera.lookAt(0,1.0,0);
+  scene.add(new THREE.HemisphereLight(0xffffff,0x33404d,0.95));
+  sun=new THREE.DirectionalLight(0xffffff,1.0); sun.position.set(5,11,7);
+  sun.castShadow=true; sun.shadow.mapSize.width=1024; sun.shadow.mapSize.height=1024;
+  sun.shadow.camera.left=-12; sun.shadow.camera.right=12; sun.shadow.camera.top=12; sun.shadow.camera.bottom=-12;
+  scene.add(sun);
+  st3d.textContent="chalu"; st3d.style.color="var(--green)";
+  return true;
+}
+
+function clearWorld(){
+  people.forEach(p=>scene.remove(p.root)); people=[];
+  world.forEach(o=>scene.remove(o)); world=[];
+}
+function add(o){ scene.add(o); world.push(o); return o; }
+
+function ground(color){
+  const g=new THREE.Mesh(new THREE.PlaneGeometry(300,300), new THREE.MeshLambertMaterial({color}));
+  g.rotation.x=-Math.PI/2; g.receiveShadow=true; add(g);
+}
+function tree(x,z,h){
+  const t=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.2,h*0.5,6), new THREE.MeshToonMaterial({color:0x6b4a2f}));
+  t.position.set(x,h*0.25,z); t.castShadow=true; add(t);
+  const c=new THREE.Mesh(new THREE.ConeGeometry(h*0.45,h*1.0,7), new THREE.MeshToonMaterial({color:0x2e9a3a}));
+  c.position.set(x,h*0.5+h*0.45,z); c.castShadow=true; add(c);
+}
+function rock(x,z,s){
+  const r=new THREE.Mesh(new THREE.DodecahedronGeometry(s,0), new THREE.MeshToonMaterial({color:0x6a7080}));
+  r.position.set(x,s*0.5,z); r.castShadow=true; add(r);
+}
+function orb(x,y,z,r,color){
+  const m=new THREE.Mesh(new THREE.SphereGeometry(r,16,12), new THREE.MeshBasicMaterial({color,fog:false}));
+  m.position.set(x,y,z); add(m);
+}
+function caveArch(){
+  const m=new THREE.MeshToonMaterial({color:0x3a3a4a});
+  [[-2.6,2.6],[2.6,2.6]].forEach(p=>{ const b=new THREE.Mesh(new THREE.BoxGeometry(1.7,5.2,2.2),m);
+    b.position.set(p[0],p[1],-3.2); b.castShadow=true; add(b); });
+  const top=new THREE.Mesh(new THREE.BoxGeometry(6.9,1.7,2.2),m); top.position.set(0,5.6,-3.2); top.castShadow=true; add(top);
+  const gl=new THREE.PointLight(0xffcc77,1.3,14); gl.position.set(0,1.8,-0.8); add(gl);
+}
+
+function skyTex(top,bottom){
+  const c=document.createElement("canvas"); c.width=8; c.height=256;
+  const x=c.getContext("2d"); const g=x.createLinearGradient(0,0,0,256);
+  g.addColorStop(0,top); g.addColorStop(1,bottom);
+  x.fillStyle=g; x.fillRect(0,0,8,256);
+  const t=new THREE.CanvasTexture(c); t.minFilter=THREE.LinearFilter; return t;
+}
+function sunOrb(color,y,z){
+  const m=new THREE.Mesh(new THREE.SphereGeometry(1.1,20,16), new THREE.MeshBasicMaterial({color}));
+  m.position.set(3.6,y,z); add(m); return m;
+}
+function clouds(n,color){
+  for(let i=0;i<n;i++){
+    const g=new THREE.Group();
+    for(let k=0;k<3;k++){
+      const b=new THREE.Mesh(new THREE.SphereGeometry(0.5+Math.random()*0.4,10,8),
+        new THREE.MeshLambertMaterial({color, transparent:true, opacity:0.9}));
+      b.position.set(k*0.7-0.7, Math.random()*0.2, Math.random()*0.3); g.add(b);
+    }
+    g.position.set(-9+i*4.5, 6.5+Math.random()*2, -12-Math.random()*6);
+    add(g);
+  }
+}
+
+function buildScene(kind){
+  clearWorld();
+  if(kind==="cave"){
+    scene.background=new THREE.Color(0x1a1c2a); scene.fog=new THREE.Fog(0x1a1c2a,10,36); sun.intensity=0.55;
+    ground(0x45455a); caveArch(); rock(-3.6,0.5,1.0); rock(3.8,-0.5,1.2);
+  }else if(kind==="night"){
+    scene.background=new THREE.Color(0x0b1030); scene.fog=new THREE.Fog(0x0b1030,12,44); sun.intensity=0.45;
+    ground(0x2a3b5c);
+    for(let i=0;i<7;i++) tree(-9+i*3.2,-7,2.6);
+    orb(-4,9,-24,1.6,0xfff2c0);
+    const stars=new THREE.Group();
+    for(let i=0;i<40;i++){ const s=new THREE.Mesh(new THREE.SphereGeometry(0.06,6,6), new THREE.MeshBasicMaterial({color:0xffffff,fog:false}));
+      s.position.set((i*37%40)-20, 8+(i*13%12), -18-(i%7)); stars.add(s); }
+    add(stars);
+  }else if(kind==="river"){
+    scene.background=skyTex("#bfe9ff","#eaf7ff"); scene.fog=new THREE.Fog(0xbfe9ff,22,70); sun.intensity=1.0; sunOrb(0xfff3b0,7,-16); clouds(3,0xffffff);
+    ground(0x3a9a3e);
+    const water=new THREE.Mesh(new THREE.PlaneGeometry(40,9), new THREE.MeshLambertMaterial({color:0x2a9db5}));
+    water.rotation.x=-Math.PI/2; water.position.set(0,0.02,-5); add(water);
+    for(let i=0;i<6;i++) tree(-9+i*3.4,-10,2.6);
+    orb(5,10,-30,2.2,0xffe27a);
+  }else{
+    scene.background=skyTex("#8fd3f4","#e8f7c8"); scene.fog=new THREE.Fog(0xbfe6f0,20,66); sun.intensity=1.0; sunOrb(0xfff0a8,7,-16); clouds(4,0xffffff);
+    ground(0x3a9a3e);
+    for(let i=0;i<8;i++) tree(-11+i*3.1,-6-((i*7)%5),2.6+((i*3)%4)*0.35);
+    for(let i=0;i<4;i++) rock(-6+i*4,2+((i*5)%3),0.5+((i*3)%3)*0.2);
+    orb(5,10,-30,2.2,0xffe27a);
+  }
+}
+
+/* ---------- cartoon character (code se, toon + outline) ---------- */
+function toonMat(color){ return new THREE.MeshToonMaterial({color}); }
+const OUTLINE=()=>new THREE.MeshBasicMaterial({color:0x14141c,side:THREE.BackSide});
+function outlined(mesh,k){ const o=new THREE.Mesh(mesh.geometry,OUTLINE()); o.scale.setScalar(k||1.09); mesh.add(o); return mesh; }
+
+function toonGrad(){
+  if(toonGrad.tex) return toonGrad.tex;
+  const c=document.createElement("canvas"); c.width=4; c.height=1;
+  const x=c.getContext("2d");
+  const steps=["#5a5a5a","#8f8f8f","#c4c4c4","#ffffff"];
+  steps.forEach((col,i)=>{ x.fillStyle=col; x.fillRect(i,0,1,1); });
+  const t=new THREE.CanvasTexture(c);
+  t.minFilter=THREE.NearestFilter; t.magFilter=THREE.NearestFilter;
+  toonGrad.tex=t; return t;
+}
+function toonMat(color){ return new THREE.MeshToonMaterial({color, gradientMap:toonGrad()}); }
+
+function makeCharacter(opt){
+  const o=Object.assign({skin:0xf2c9a0, shirt:0x3366cc, pant:0x2b2b3a, hair:0x1b1b22, scale:1, girl:false}, opt||{});
+  const root=new THREE.Group();
+  const body=new THREE.Group(); root.add(body);
+
+  // pair (joote)
+  [-0.14,0.14].forEach(x=>{
+    const foot=new THREE.Mesh(new THREE.BoxGeometry(0.17,0.10,0.28), toonMat(0x22242b));
+    foot.position.set(x,0.05,0.06); foot.castShadow=true; body.add(foot);
+  });
+
+  // dhad
+  const torso=outlined(new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.29,0.66,14), toonMat(o.shirt)),1.07);
+  torso.position.y=0.90; torso.castShadow=true; body.add(torso);
+
+  // gardan
+  const neck=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.10,0.12,10), toonMat(o.skin));
+  neck.position.y=1.26; body.add(neck);
+
+  // bada sir (cartoon proportion)
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.34,22,18), toonMat(o.skin));
+  head.position.y=1.62; head.castShadow=true; body.add(head);
+  outlined(head,1.05);
+
+  // baal
+  const hair=new THREE.Mesh(new THREE.SphereGeometry(0.355,20,16,0,Math.PI*2,0,Math.PI*0.58), toonMat(o.hair));
+  hair.position.y=1.64; body.add(hair);
+  if(o.girl){
+    const plait=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.05,0.66,8), toonMat(o.hair));
+    plait.position.set(0.24,1.28,-0.14); body.add(plait);
+  }
+
+  // aankhein: safed + kaali putli + chamak
+  const eyes=[];
+  [-0.125,0.125].forEach(x=>{
+    const eg=new THREE.Group(); eg.position.set(x,1.64,0.285);
+    const w=new THREE.Mesh(new THREE.SphereGeometry(0.082,14,12), new THREE.MeshBasicMaterial({color:0xffffff})); eg.add(w);
+    const pu=new THREE.Mesh(new THREE.SphereGeometry(0.042,12,10), new THREE.MeshBasicMaterial({color:0x14161c}));
+    pu.position.set(0,0,0.062); eg.add(pu);
+    const gl=new THREE.Mesh(new THREE.SphereGeometry(0.016,8,8), new THREE.MeshBasicMaterial({color:0xffffff}));
+    gl.position.set(0.018,0.022,0.095); eg.add(gl);
+    body.add(eg); eyes.push(eg);
+  });
+
+  // bhaunh
+  [-0.125,0.125].forEach((x,i)=>{
+    const b=new THREE.Mesh(new THREE.BoxGeometry(0.10,0.018,0.02), new THREE.MeshBasicMaterial({color:o.hair}));
+    b.position.set(x,1.75,0.29); b.rotation.z=i?-0.12:0.12; body.add(b);
+  });
+
+  // mooh
+  const mouth=new THREE.Mesh(new THREE.BoxGeometry(0.13,0.028,0.02), new THREE.MeshBasicMaterial({color:0x8a2f2f}));
+  mouth.position.set(0,1.49,0.315); body.add(mouth);
+
+  // gaal
+  [-0.20,0.20].forEach(x=>{
+    const c=new THREE.Mesh(new THREE.CircleGeometry(0.05,10), new THREE.MeshBasicMaterial({color:0xf08b8b, transparent:true, opacity:0.55}));
+    c.position.set(x,1.54,0.30); body.add(c);
+  });
+
+  function limb(x,y,len,color,rad){
+    const pivot=new THREE.Group(); pivot.position.set(x,y,0);
+    const m=outlined(new THREE.Mesh(new THREE.CylinderGeometry(rad||0.075,rad?rad*0.9:0.065,len,10), toonMat(color)),1.1);
+    m.position.y=-len/2; m.castShadow=true; pivot.add(m);
+    const hand=new THREE.Mesh(new THREE.SphereGeometry(rad?rad*1.15:0.085,12,10), toonMat(color===o.pant?o.skin:o.skin));
+    hand.position.y=-len; pivot.add(hand);
+    body.add(pivot); return pivot;
+  }
+  const armL=limb(-0.30,1.16,0.52,o.shirt), armR=limb(0.30,1.16,0.52,o.shirt);
+  const legL=limb(-0.13,0.62,0.55,o.pant,0.085), legR=limb(0.13,0.62,0.55,o.pant,0.085);
+
+  if(o.girl){
+    const skirt=outlined(new THREE.Mesh(new THREE.ConeGeometry(0.33,0.40,16), toonMat(0xcc4477)),1.05);
+    skirt.position.y=0.66; body.add(skirt);
+  }
+
+  root.scale.setScalar(o.scale);
+  root.userData={armL,armR,legL,legR,mouth,head,body,hair,eyes};
+  return root;
+}
+
+const KINDS={
+  boy:  {skin:0xf2c9a0, shirt:0x3366cc, pant:0x2b2b3a, hair:0x1b1b22, scale:1.0},
+  girl: {skin:0xf7d3b0, shirt:0xdd5588, pant:0x3a2b3a, hair:0x2a1a12, scale:0.95, girl:true},
+  man:  {skin:0xe0b48a, shirt:0x557755, pant:0x2b2b3a, hair:0x141414, scale:1.12},
+  robot:{skin:0x9aa7b4, shirt:0x6f7b8a, pant:0x4b5563, hair:0x333a44, scale:1.05}
+};
+const ACTIONS=["walk","run","idle","scared","happy","wave"];
+
+// portrait (9:16) frame me chhoti jagah hai, isliye character kam faasle par: akela x=0, do log x=±0.95
+function spawn(kind, x, faceLeft, action){
+  const spec=KINDS[kind]||KINDS.boy;
+  const root=makeCharacter(spec);
+  root.position.set(x,0,0);
+  const two=Math.abs(x)>0.01;
+  const yaw=two?0.55:0.8;
+  root.rotation.y=faceLeft?-yaw:yaw;
+  scene.add(root);
+  const p={root, x0:x, kind, dir:faceLeft?-1:1, two, action:ACTIONS.includes(action)?action:"walk", phase:Math.random()*3, lastS:false};
+  people.push(p);
+  stchar.textContent=people.length+" character";
+  stchar.style.color="var(--green)";
+  return p;
+}
+
+function animatePerson(p, t, sec, speaking){
+  const u=p.root.userData, a=p.action, ph=p.phase;
+  u.armL.rotation.set(0,0,0); u.armR.rotation.set(0,0,0);
+  u.legL.rotation.x=0; u.legR.rotation.x=0;
+  u.body.position.set(0,0,0); u.body.rotation.set(0,0,0);
+  let mouthOpen=0;
+
+  if(a==="walk"||a==="run"){
+    const sp=a==="run"?10:6, amp=a==="run"?0.95:0.6;
+    const sw=Math.sin(sec*sp+ph)*amp;
+    u.armL.rotation.x=sw; u.armR.rotation.x=-sw;
+    u.legL.rotation.x=-sw*0.9; u.legR.rotation.x=sw*0.9;
+    u.body.position.y=Math.abs(Math.sin(sec*sp+ph))*(a==="run"?0.1:0.05);
+    if(a==="run") u.body.rotation.x=0.15;
+    const s=Math.sin(sec*sp+ph)>0;
+    if(s!==p.lastS){ p.lastS=s; if(p===people[0]) footstep(); }
+  }else if(a==="idle"){
+    u.body.position.y=Math.sin(sec*2+ph)*0.012;
+    u.armL.rotation.z=-0.08; u.armR.rotation.z=0.08;
+    if(speaking) u.armR.rotation.x=-0.8+Math.sin(sec*5)*0.35;   // baat karte waqt haath hilta hai
+  }else if(a==="scared"){
+    u.body.position.x=Math.sin(sec*42+ph)*0.012;
+    u.body.rotation.x=-0.1;
+    u.armL.rotation.x=-1.3; u.armR.rotation.x=-1.3;
+    u.armL.rotation.z=0.5;  u.armR.rotation.z=-0.5;
+    u.legL.rotation.x=-0.15; u.legR.rotation.x=0.15;
+    mouthOpen=2.4;
+  }else if(a==="happy"){
+    u.body.position.y=Math.abs(Math.sin(sec*5+ph))*0.22;
+    u.armL.rotation.z=-2.6+Math.sin(sec*9)*0.2; u.armR.rotation.z=2.6-Math.sin(sec*9)*0.2;
+    mouthOpen=1.8;
+  }else if(a==="wave"){
+    u.body.position.y=Math.sin(sec*2+ph)*0.012;
+    u.armR.rotation.z=2.3+Math.sin(sec*9)*0.35;
+    u.armL.rotation.z=-0.08;
+  }
+
+  // aankh jhapakna (sirf aankhein)
+  const blink=((sec*0.9+ph)%3)<0.12?0.1:1;
+  u.eyes.forEach(e=>{ e.scale.y=blink; });
+  // mooh
+  u.mouth.scale.y = speaking ? (1.2+Math.abs(Math.sin(sec*18))*3.2) : (1+mouthOpen);
+}
+
+/* ---------- audio: TTS mp3 + music + effects (sab Web Audio) ---------- */
+function audioCtx(){
+  if(!actx){ actx=new (window.AudioContext||window.webkitAudioContext)(); audioDest=actx.createMediaStreamDestination(); }
+  return actx;
+}
+function ttsURL(text){
+  return "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=hi&q="+encodeURIComponent(text);
+}
+async function timedFetch(u,ms){
+  const c=new AbortController(); const id=setTimeout(()=>c.abort(),ms);
+  try{ return await fetch(u,{signal:c.signal}); } finally{ clearTimeout(id); }
+}
+async function fetchVoice(text){
+  const direct=ttsURL(text);
+  const proxies=[
+    "https://api.allorigins.win/raw?url="+encodeURIComponent(direct),
+    "https://corsproxy.io/?"+encodeURIComponent(direct),
+    "https://api.codetabs.com/v1/proxy?quest="+encodeURIComponent(direct)
+  ];
+  for(const u of proxies){
+    try{
+      const r=await timedFetch(u,9000); if(!r.ok) continue;
+      const buf=await r.arrayBuffer();
+      if(buf.byteLength<2000) continue;
+      return await audioCtx().decodeAudioData(buf);
+    }catch(e){}
+  }
+  return null;
+}
+async function getVoice(text){
+  if(voiceCache.has(text)) return voiceCache.get(text);
+  const a=await fetchVoice(text); if(a) voiceCache.set(text,a);
+  return a;
+}
+async function prefetchAll(){
+  const texts=[...new Set(shots.map(s=>s.say).filter(Boolean))];
+  let got=0;
+  const queue=texts.slice();
+  const worker=async()=>{ while(queue.length){ const t=queue.shift(); if(await getVoice(t)) got++; } };
+  await Promise.all([worker(),worker(),worker(),worker()]);
+  return {want:texts.length, got};
+}
+function playBuffer(audio){
+  const ac=audioCtx();
+  if(currentAudio){ try{currentAudio.stop();}catch(e){} }
+  const src=ac.createBufferSource(); src.buffer=audio;
+  const g=ac.createGain(); g.gain.value=1.0;
+  src.connect(g); g.connect(ac.destination); if(audioDest) g.connect(audioDest);
+  src.start();
+  currentAudio=src;
+  return src;
+}
+
+const sfx={bus:null,nodes:[],stepBuf:null};
+function makeNoise(ac,sec){
+  const n=Math.floor(ac.sampleRate*sec), b=ac.createBuffer(1,n,ac.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+  return b;
+}
+function startAmbience(kind){
+  const ac=audioCtx(); stopAmbience();
+  const bus=ac.createGain(); bus.gain.value=0;
+  bus.connect(ac.destination); if(audioDest) bus.connect(audioDest);
+  bus.gain.linearRampToValueAtTime(0.32,ac.currentTime+0.6);
+  sfx.bus=bus;
+  const moods={jungle:[196,247,294],cave:[110,130.8,165],night:[130.8,155.6,196],river:[220,277,330]};
+  (moods[kind]||moods.jungle).forEach((f,i)=>{
+    const o=ac.createOscillator(); o.type=i?"sine":"triangle"; o.frequency.value=f;
+    const g=ac.createGain(); g.gain.value=0.04;
+    const lfo=ac.createOscillator(); lfo.frequency.value=0.15+i*0.07;
+    const lg=ac.createGain(); lg.gain.value=0.018; lfo.connect(lg); lg.connect(g.gain);
+    o.connect(g); g.connect(bus); o.start(); lfo.start(); sfx.nodes.push(o,lfo);
+  });
+  const src=ac.createBufferSource(); src.buffer=makeNoise(ac,2); src.loop=true;
+  const bp=ac.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=kind==="cave"?300:650; bp.Q.value=0.6;
+  const wg=ac.createGain(); wg.gain.value=kind==="river"?0.11:0.05;
+  src.connect(bp); bp.connect(wg); wg.connect(bus); src.start(); sfx.nodes.push(src);
+}
+function stopAmbience(){
+  const nodes=sfx.nodes, bus=sfx.bus; sfx.nodes=[]; sfx.bus=null;
+  if(!bus||!actx) return;
+  try{ bus.gain.cancelScheduledValues(actx.currentTime); bus.gain.setValueAtTime(bus.gain.value,actx.currentTime); bus.gain.linearRampToValueAtTime(0,actx.currentTime+0.5); }catch(e){}
+  setTimeout(()=>{ nodes.forEach(n=>{try{n.stop();}catch(e){}}); try{bus.disconnect();}catch(e){} },700);
+}
+function footstep(){
+  if(!actx||!sfx.bus||actx.state!=="running") return;
+  const ac=actx; const src=ac.createBufferSource();
+  src.buffer=sfx.stepBuf||(sfx.stepBuf=makeNoise(ac,0.12));
+  const lp=ac.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=380;
+  const g=ac.createGain(); g.gain.setValueAtTime(0.7,ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.12);
+  src.connect(lp); lp.connect(g); g.connect(sfx.bus); src.start();
+}
+
+/* ---------- overlay ---------- */
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath(); }
+function wrap(text,maxW,c){ const words=String(text||"").split(/\s+/); const out=[]; let cur="";
+  words.forEach(w=>{ const t=cur?cur+" "+w:w; if(c.measureText(t).width>maxW&&cur){out.push(cur);cur=w;} else cur=t; }); if(cur) out.push(cur); return out; }
+
+function overlay(s, fade){
+  ctx.fillStyle="rgba(0,0,0,.5)"; ctx.fillRect(0,0,W,H*0.05); ctx.fillRect(0,H-H*0.05,W,H*0.05);
+  let subH=0;
+  if(s.text){
+    ctx.font="800 36px Manrope, sans-serif"; ctx.textAlign="center";
+    const lines=wrap(s.text,W-90,ctx); const lh=44; subH=lines.length*lh+28;
+    ctx.fillStyle="rgba(0,0,0,.62)"; roundRect(34,H-subH-34,W-68,subH,12); ctx.fill();
+    ctx.fillStyle="#fff"; let y=H-subH-34+38;
+    lines.forEach(l=>{ ctx.fillText(l,W/2,y); y+=lh; });
+  }
+  if(s.say){
+    ctx.font="700 28px Manrope, sans-serif"; ctx.textAlign="left";
+    const lines=wrap(s.say,W-120,ctx); const h=lines.length*34+54;
+    const y=H-h-(subH+58);
+    ctx.fillStyle="rgba(8,12,18,.8)"; roundRect(28,y,W-56,h,16); ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,.16)"; ctx.lineWidth=2; roundRect(28,y,W-56,h,16); ctx.stroke();
+    if(s.speaker){ ctx.fillStyle="#3fb950"; ctx.font="800 20px Manrope, sans-serif"; ctx.fillText(String(s.speaker).toUpperCase(),50,y+30); }
+    ctx.fillStyle="#fff"; ctx.font="600 28px Manrope, sans-serif";
+    let yy=y+(s.speaker?64:38); lines.forEach(l=>{ ctx.fillText(l,50,yy); yy+=34; });
+  }
+  if(fade>0){ ctx.fillStyle="rgba(0,0,0,"+fade+")"; ctx.fillRect(0,0,W,H); }
+}
+
+// camera: portrait frame ki chaudai ~ 0.24 x doori. Isliye camera 6.5-9 door, characters |x|<1.5
+function moveCamera(cam, t){
+  const look=new THREE.Vector3(0,1.0,0);
+  if(cam===0){ camera.position.set(0.3*t-0.15, 2.4-0.3*t, 8.2-1.7*t); }
+  else if(cam===1){ camera.position.set(-1.6+3.2*t, 2.0, 6.8); look.set(0,1.1,0); }
+  else if(cam===2){ camera.position.set(0, 4.2-0.5*t, 9.5-1.0*t); look.set(0,0.9,0); }
+  else { camera.position.set(2.4-0.9*t, 2.2, 7.4); look.set(0,1.1,0); }
+  camera.lookAt(look);
+}
+
+function renderFrame(shot, t, speaking, sec){
+  sec=sec||0;
+  people.forEach((p,i)=>{
+    const moving=(p.action==="walk"||p.action==="run");
+    const span=p.two?0.8:1.6;
+    p.root.position.x = p.x0 + (moving?(t-0.5)*span*p.dir:0);
+    const sp=String(shot.speaker||"");
+    const who=/narrator/i.test(sp)?-1:(/girl/i.test(sp)&&people.length>1?1:0);   // kaun bol raha hai
+    animatePerson(p,t,sec,speaking&&i===who);
+  });
+  moveCamera(shot.cam||0, t);
+  renderer.render(scene,camera);
+  ctx.fillStyle="#000"; ctx.fillRect(0,0,W,H);
+  try{ ctx.drawImage(renderer.domElement,0,0,W,H); }catch(e){}
+  let fade=0;
+  if(t<0.1) fade=(1-t/0.1)*0.85;
+  if(t>0.92) fade=((t-0.92)/0.08)*0.85;
+  overlay(shot, fade);
+}
+
+/* ---------- story ---------- */
+/* ---------- AI providers: Groq, OpenAI, OpenRouter, Gemini ---------- */
+const PROVIDERS=[
+  {id:"groq",       name:"Groq",       kind:"openai", base:"https://api.groq.com/openai/v1", model:"qwen/qwen3.8-27b"},
+  {id:"openai",     name:"OpenAI",     kind:"openai", base:"https://api.openai.com/v1", model:"gpt-4o-mini"},
+  {id:"openrouter", name:"OpenRouter", kind:"openai", base:"https://openrouter.ai/api/v1", model:"meta-llama/llama-3.3-70b-instruct:free"},
+  {id:"gemini",     name:"Gemini",     kind:"gemini", base:"https://generativelanguage.googleapis.com/v1beta", model:""}
+];
+function allKeys(){ try{ return (JSON.parse(localStorage.getItem(KSTORE)||"{}").keys)||{}; }catch(e){ return {}; } }
+function providerKey(id){ const k=allKeys(); return k[id]||""; }
+function usableProviders(){ return PROVIDERS.filter(p=>providerKey(p.id)); }
+
+let geminiModel="";
+async function geminiPick(key){
+  if(geminiModel) return geminiModel;
+  const r=await fetch(PROVIDERS[3].base+"/models?pageSize=200",{headers:{"x-goog-api-key":key}});
+  if(!r.ok) throw new Error("gemini models HTTP "+r.status);
+  const j=await r.json();
+  const names=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent"))
+    .map(m=>String(m.name).replace(/^models\//,""));
+  const score=n=>{ let v=0; if(/flash/i.test(n)) v+=4; if(/pro/i.test(n)) v+=1; if(/latest/i.test(n)) v+=2;
+    if(/preview|exp|thinking|lite|image|tts|audio|embed|live/i.test(n)) v-=4;
+    const m=n.match(/(\d+(?:\.\d+)?)/); v+=m?Number(m[1]):0; return v; };
+  geminiModel=[...names].sort((a,b)=>score(b)-score(a))[0];
+  if(!geminiModel) throw new Error("gemini model nahi mila");
+  return geminiModel;
+}
+
+async function callOne(p, system, user){
+  const key=providerKey(p.id);
+  if(p.kind==="gemini"){
+    const model=await geminiPick(key);
+    const r=await fetch(p.base+"/models/"+encodeURIComponent(model)+":generateContent",{
+      method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
+      body:JSON.stringify({systemInstruction:{parts:[{text:system}]},
+        contents:[{role:"user",parts:[{text:user}]}],
+        generationConfig:{temperature:0.85,maxOutputTokens:1400}})});
+    if(!r.ok) throw new Error("HTTP "+r.status+" "+(await r.text()).slice(0,90));
+    const j=await r.json(); const c=j.candidates&&j.candidates[0];
+    const txt=(c&&c.content&&c.content.parts||[]).map(x=>x.text||"").join("");
+    if(!String(txt).trim()) throw new Error("jawab khaali");
+    return txt;
+  }
+  const r=await fetch(p.base+"/chat/completions",{
+    method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+    body:JSON.stringify({model:p.model,temperature:0.85,max_tokens:1400,
+      messages:[{role:"system",content:system},{role:"user",content:user}]})});
+  if(!r.ok) throw new Error("HTTP "+r.status+" "+(await r.text()).slice(0,90));
+  const j=await r.json();
+  const txt=(j.choices&&j.choices[0]&&j.choices[0].message.content)||"";
+  if(!String(txt).trim()) throw new Error("jawab khaali");
+  return txt;
+}
+
+/* ek provider fail ho to agla — jo key jis order me save hai */
+async function askAI(system, user){
+  const list=usableProviders();
+  if(!list.length) throw new Error("Koi AI key nahi mili — Simple Agent page par Groq/Gemini/OpenAI ki key save karo.");
+  let last=null;
+  for(const p of list){
+    try{
+      const txt=await callOne(p, system, user);
+      stai.textContent=p.name+" ✓"; stai.style.color="var(--green)";
+      return txt;
+    }catch(e){
+      last=e;
+      stai.textContent=p.name+" fail"; stai.style.color="var(--red)";
+    }
+  }
+  throw new Error("Saare AI fail — "+(last?last.message:"?"));
+}
+
+document.getElementById("make").onclick=async ()=>{
+  const story=document.getElementById("topic").value.trim();
+  if(!story){ show(msg1,"bad","Pehle kahani likho."); return; }
+  if(!init3D()){ show(msg1,"bad","3D chalu nahi hua — page refresh karo ya browser update karo."); return; }
+  const n=document.getElementById("nshots").value;
+  show(msg1,"info","Director plan bana raha hai…");
+  try{
+    const raw=await askAI("Tum 3D cartoon film ke director ho. Sirf JSON do.", `Kahani: "${story}"
+Ise ${n} shots me todo (3D cartoon).
+Har shot: {"text":"subtitle 6-8 shabd Hinglish","say":"dialogue ek chhoti line (max 12 shabd)","speaker":"Boy|Girl|Narrator",
+"scene":"jungle|cave|night|river","hero":"boy|girl|man|robot","partner":"girl|boy|(khaali)",
+"hero_action":"walk|run|idle|scared|happy|wave","partner_action":"walk|run|idle|scared|happy|wave","cam":0}
+cam: 0=dolly in, 1=side, 2=high wide, 3=angle.
+Sirf JSON: {"title":"...","shots":[...]}`);
+    const d=parseJSON(raw);
+    applyShots(d.shots,"");
+  }catch(e){ show(msg1,"bad","Ruk gaya: "+e.message); }
+};
+document.getElementById("demo").onclick=()=>{
+  if(!init3D()){ show(msg1,"bad","3D chalu nahi hua — page refresh karo ya browser update karo."); return; }
+  try{ applyShots(DEMO,"(demo plan)"); }catch(e){ show(msg1,"bad","Ruk gaya: "+e.message); }
+};
+
+/* ---------- playback ---------- */
+function pickMime(){
+  const c=[["video/mp4;codecs=avc1.42E01E,mp4a.40.2","mp4"],["video/webm;codecs=vp9,opus","webm"],["video/webm","webm"]];
+  for(const [m,e] of c){ try{ if(MediaRecorder.isTypeSupported(m)) return {mime:m,ext:e}; }catch(x){} }
+  return {mime:"",ext:"webm"};
+}
+
+let wakeLock=null, stopFlag=false;
+async function keepAwake(){ try{ if(navigator.wakeLock && navigator.wakeLock.request){ wakeLock=await navigator.wakeLock.request("screen"); } }catch(e){} }
+function releaseAwake(){ try{ if(wakeLock) wakeLock.release(); }catch(e){} wakeLock=null; }
+
+async function playFilm(record){
+  if(!shots.length){ show(msg2,"bad","Pehle step 1 dabao (ya Demo plan)."); return; }
+  if(!init3D()){ show(msg2,"bad","3D chalu nahi hua."); return; }
+  if(running) return; running=true; stopFlag=false;
+  dlBox.innerHTML="";
+  await keepAwake();
+  const per=parseInt(document.getElementById("secs").value,10);
+  try{
+    audioCtx();                                   // click ke andar hi banao
+    try{ await actx.resume(); }catch(e){}
+
+    // 1) pehle saari awaazein download (record me ruka hua frame na aaye)
+    show(msg2,"info","Awaaz taiyar ho rahi hai…");
+    const v=await prefetchAll();
+    voiceOK=v.want===0 || v.got>0;
+    stvoice.textContent = v.want?(v.got+"/"+v.want+" mp3 mili"):"—";
+    stvoice.style.color = v.got===v.want?"var(--green)":(v.got?"var(--amber)":"var(--red)");
+
+    // 2) recorder
+    let mimeInfo={mime:"",ext:"webm"};
+    if(record){
+      const stream=stage.captureStream(30);
+      const tracks=[...stream.getVideoTracks(), ...audioDest.stream.getAudioTracks()];   // music hamesha, isliye audio track hamesha
+      mimeInfo=pickMime();
+      chunks=[];
+      recorder=new MediaRecorder(new MediaStream(tracks), mimeInfo.mime?{mimeType:mimeInfo.mime,videoBitsPerSecond:5000000}:{videoBitsPerSecond:5000000});
+      recorder.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
+      recorder.onstop=()=>{
+        const type=mimeInfo.ext==="mp4"?"video/mp4":"video/webm";
+        const blob=new Blob(chunks,{type});
+        if(blobUrl) URL.revokeObjectURL(blobUrl);
+        blobUrl=URL.createObjectURL(blob);
+        const name="seetal-3d-"+Date.now()+"."+mimeInfo.ext;
+        const a=document.createElement("a"); a.href=blobUrl; a.download=name;
+        document.body.appendChild(a); a.click(); a.remove();
+        dlBox.innerHTML='<a href="'+blobUrl+'" download="'+name+'">⬇ Video download karo ('+(blob.size/1048576).toFixed(2)+' MB, .'+mimeInfo.ext+')</a>';
+        show(msg2,v.got===v.want?"ok":"info","Video ban gayi. Awaaz: "+v.got+"/"+v.want+" dialogue record hue"+(v.got<v.want?" — baaki ki awaaz proxy fail hone se nahi aayi.":"."));
+      };
+      renderFrame(shots[0],0,false,0);
+      recorder.start(400);
+      const sb=document.getElementById("stopbtn"); if(sb) sb.style.display="block";
+      show(msg2,"info","Record ho raha hai… (Roko dabao to yahin ruk jayega)");
+    }else show(msg2,"info","Film chal rahi hai…");
+
+    // 3) shots
+    let missing=0;
+    for(let i=0;i<shots.length && !stopFlag;i++){
+      const s=shots[i];
+      buildScene(s.scene);
+      spawn(s.hero,s.partner?-0.95:0,false,s.heroAct);
+      if(s.partner) spawn(s.partner,0.95,true,s.partnerAct);
+      startAmbience(s.scene);
+
+      let dur=per, speakMs=0;
+      if(s.say){
+        const audio=voiceCache.get(s.say);
+        if(audio){ playBuffer(audio); speakMs=audio.duration*1000; dur=Math.max(per,speakMs+900); }
+        else{
+          missing++;
+          speakMs=Math.min(7000,s.say.length*95); dur=Math.max(per,speakMs+900);
+          if(window.speechSynthesis){ const u=new SpeechSynthesisUtterance(s.say); u.lang="hi-IN"; u.rate=0.92; speechSynthesis.speak(u); }
+        }
+      }
+      await new Promise(res=>{
+        const t0=performance.now();
+        (function loop(){
+          if(stopFlag){ res(); return; }
+          const el=performance.now()-t0, t=Math.min(1,el/dur);
+          renderFrame(s,t,el<speakMs,el/1000);
+          if(t<1) requestAnimationFrame(loop); else res();
+        })();
+      });
+    }
+    stopAmbience();
+    await sleep(700);
+    if(record && recorder && recorder.state!=="inactive") recorder.stop();
+    else if(!record) show(msg2,"ok","Film poori chali — ab record dabao."+(missing?" (Awaaz "+missing+" shot me nahi mili.)":""));
+  }catch(e){
+    stopAmbience();
+    if(recorder&&recorder.state!=="inactive"){ try{recorder.stop();}catch(x){} }
+    show(msg2,"bad","Ruk gaya: "+e.message);
+  }finally{ running=false; stopFlag=false; releaseAwake();
+    const sb=document.getElementById("stopbtn"); if(sb) sb.style.display="none"; }
+}
+
+document.getElementById("play").onclick=()=>playFilm(false);
+document.getElementById("rec").onclick=()=>playFilm(true);
+const stopBtnEl=document.getElementById("stopbtn");
+if(stopBtnEl) stopBtnEl.onclick=()=>{ stopFlag=true; show(msg2,"info","Rok rahe hain…"); };
+if(init3D()){ buildScene("jungle"); spawn("boy",0,false,"idle"); renderFrame({text:"",say:"",cam:0},0.5,false,0); }
+</script>
+</body>
+</html>
