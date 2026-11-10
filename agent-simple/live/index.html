@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Seetal Agent — v11 (bade tool bhi banata hai)</title>
+<title>Seetal Agent — v12 (khud poora app likhta hai)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -91,7 +91,7 @@ textarea:focus{border-color:var(--blue)}
 </head>
 <body>
 <div class="wrap">
-  <h1>Seetal Agent <span style="font-size:13px;color:var(--dim);font-family:'Azeret Mono',monospace">v11</span></h1>
+  <h1>Seetal Agent <span style="font-size:13px;color:var(--dim);font-family:'Azeret Mono',monospace">v12</span></h1>
   <div class="sub">Bas ek jagah key daalni hai — neeche hari dashed line wale box me.</div>
 
   <div class="pointer">
@@ -136,7 +136,7 @@ textarea:focus{border-color:var(--blue)}
   <div class="out" id="out"></div>
 
   <div class="foot">
-    Keys isi browser me save hoti hain — naya version kholne par bhi bachi rehti hain. Purana version: <a href="../v10/">v10</a>, <a href="../v9/">v9</a>, <a href="../v8/">v8</a>.
+    Keys isi browser me save hoti hain — naya version kholne par bhi bachi rehti hain. Purana version: <a href="../v11/">v11</a>, <a href="../v10/">v10</a>, <a href="../v9/">v9</a>.
   </div>
 </div>
 
@@ -199,15 +199,16 @@ Ek baar me ek tool. Sirf diye gaye tools use karo. Data jhooth mat banao — too
 Jawab Hinglish me, chhota aur seedha.
 7. Kaam bada ho to pehle chhote steps me todo, phir ek-ek tool chalao.
 8. App banana ho to make_app se poora chalta hua single-file HTML do — placeholder nahi, asli code.
-9. Bada tool maanga jaye (video editor, 3D, dashboard, game) to "mumkin nahi" bol kar rukna mana hai.
-   Pehle batao browser me kya ho sakta hai, phir make_app se woh chalta hua version bana do.
-   Jo sach me browser me nahi hota (jaise text se nayi film banana — woh cloud AI ka kaam hai), sirf usi ko saaf mana karo.`;
+9. Tum ek builder ho. Bada tool maanga jaye (video editor, 3D, dashboard, game, koi bhi app) to "mumkin nahi" bolna mana hai.
+   Pehle 2-3 line ka plan socho, phir make_app me POORA chalta hua single-file HTML likho — buttons, CSS, JS, sab.
+   Code me koi placeholder (TODO, "yahan apna code") nahi. Jitna bada chahiye utna likho.
+10. Sirf woh cheez mana karo jo sach me browser me nahi hoti (cloud AI video generation, paid server API) — aur uske saath browser wala best alternative do.`;
 const TOOLS=[["time_now","{}","date/time"],["calc",'{"expr":"..."}',"ganit"],["wiki",'{"q":"..."}',"Wikipedia"],
  ["quote",'{"symbol":"..."}',"Yahoo price"],["crypto",'{"coin":"bitcoin"}',"crypto price"],
  ["http_get",'{"url":"https://..."}',"allowlist wale site se text"],
  ["note_save",'{"key":"...","value":"..."}',"note"],["note_get",'{"key":"..."}',"note padho"],
  ["notes_list","{}","saare notes"],
- ["make_app",'{"name":"app.html","html":"..."}',"naya app file banao aur download do"]];
+ ["make_app",'{"name":"app.html","html":"..."}',"poora app likho, preview + download do"],["apps_list","{}","bane hue apps ki list"]];
 
 const MSTORE="seetal-models-v1";
 let models={};
@@ -267,7 +268,7 @@ async function geminiOnce(key, model, messages){
   const contents=messages.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]}));
   const r=await fetch(`${P.gemini.base}/models/${encodeURIComponent(model)}:generateContent`,{
     method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
-    body:JSON.stringify({systemInstruction:{parts:[{text:POLICY}]},contents,generationConfig:{temperature:0.3,maxOutputTokens:1800}})});
+    body:JSON.stringify({systemInstruction:{parts:[{text:POLICY}]},contents,generationConfig:{temperature:0.3,maxOutputTokens:4000}})});
   if(!r.ok){
     const body=await r.text();
     const err=new Error("HTTP "+r.status+" — "+body.slice(0,140));
@@ -279,7 +280,7 @@ async function geminiOnce(key, model, messages){
 async function openaiOnce(id, model, messages){
   const r=await fetch(P[id].base+"/chat/completions",{
     method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+keys[id]},
-    body:JSON.stringify({model,temperature:0.3,max_tokens:1800,messages:[{role:"system",content:POLICY},...messages]})});
+    body:JSON.stringify({model,temperature:0.3,max_tokens:4000,messages:[{role:"system",content:POLICY},...messages]})});
   if(!r.ok){
     const body=await r.text();
     const err=new Error("HTTP "+r.status+" — "+body.slice(0,140));
@@ -421,6 +422,9 @@ async function runTool(name,args){
     const ns=JSON.parse(localStorage.getItem("seetal-notes")||"{}");
     ns[k]={v:String(args.value||"").slice(0,1000),at:new Date().toISOString()};
     localStorage.setItem("seetal-notes",JSON.stringify(ns));return {saved:k};}
+  if(name==="apps_list"){
+    return JSON.parse(localStorage.getItem("seetal-apps")||"[]");
+  }
   if(name==="notes_list"){const ns=JSON.parse(localStorage.getItem("seetal-notes")||"{}");
     return Object.keys(ns).map(k=>({key:k,value:String(ns[k].v).slice(0,100)}));}
   if(name==="crypto"){
@@ -446,9 +450,14 @@ async function runTool(name,args){
     const nm=String(args.name||"app.html").replace(/[^a-zA-Z0-9._-]/g,"_");
     let h=String(args.html||"");
     if(h.length<50) throw new Error("html bahut chhota hai");
+    if(!/script|canvas|button|input|style/i.test(h)) throw new Error("code me koi kaam karne wala hissa nahi mila");
     if(!/^\s*<!DOCTYPE|^\s*<html/i.test(h)) h='<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+nm+'</title></head><body>\n'+h+'\n</body></html>';
+    const reg=JSON.parse(localStorage.getItem("seetal-apps")||"[]");
+    reg.unshift({name:nm, at:new Date().toISOString(), size:h.length});
+    localStorage.setItem("seetal-apps", JSON.stringify(reg.slice(0,30)));
     const blob=new Blob([h],{type:"text/html"});
     const url=URL.createObjectURL(blob);
+    try{ window.open(url,"_blank","noopener"); }catch(_){}
     const a=document.createElement("a"); a.href=url; a.download=nm; document.body.appendChild(a); a.click();
     setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },4000);
     return {saved:nm, size:h.length, note:"file download ho gayi — Downloads me dekho"};
@@ -466,7 +475,19 @@ async function runOne(goal){
     let raw;
     try{ raw=await callModel(messages); }catch(e){ bub("a","Error: "+e.message); break; }
     let obj;
-    try{ obj=parseJSON(raw); }catch(e){ bub("a",raw.trim()); messages.push({role:"assistant",content:raw},{role:"user",content:'Sirf JSON do: {"final":"..."} ya {"tool":"...","args":{...}}'}); continue; }
+    try{ obj=parseJSON(raw); }
+    catch(e){
+      const fence=String(raw).match(/```(?:html)?\s*([\s\S]*?)```/i);
+      if(fence && /<html|<body|<div|<canvas|<script|<button/i.test(fence[1])){
+        const res=await runTool("make_app",{name:"app-"+Date.now()+".html", html:fence[1]});
+        bub("t","▶ make_app (code block se)\n✓ "+JSON.stringify(res).slice(0,200));
+        messages.push({role:"assistant",content:raw},{role:"user",content:"App ban gaya. Ab final JSON do: {\"final\":\"kya bana aur kaise chalayein\"}"});
+        continue;
+      }
+      bub("a",raw.trim());
+      messages.push({role:"assistant",content:raw},{role:"user",content:'Sirf JSON do: {"final":"..."} ya {"tool":"make_app","args":{"name":"...","html":"..."}}'});
+      continue;
+    }
     if(obj.final){ bub("a",obj.final); break; }
     if(!obj.tool){ messages.push({role:"assistant",content:raw},{role:"user",content:"tool ya final do — JSON me."}); continue; }
     const tb=bub("t","▶ "+obj.tool+"  "+JSON.stringify(obj.args||{}));
