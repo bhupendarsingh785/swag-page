@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Vinod — Seetal ka worker</title>
+<title>Agent Vinod v3 — system manager</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -46,13 +46,23 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
 </head>
 <body>
 <div class="wrap">
-  <h1>Agent Vinod</h1>
+  <h1>Agent Vinod <span style="font-size:11px;color:var(--green);font-family:'Azeret Mono',monospace">v3 MANAGER</span></h1>
   <div class="sub">Seetal ka worker — bada kaam karta hai, jhooth nahi bolta. Result ek "card" me deta hai jo Seetal ko wapas diya ja sakta hai.</div>
 
   <div class="card">
     <details>
       <summary>MODELS &amp; KEYS (ek baar bharo — sirf isi browser me rehti hain)</summary>
       <div class="prov" id="prov" style="margin-top:10px"></div>
+      <div class="card" style="background:var(--bg);margin-top:12px">
+        <label>Koi bhi naya API jodo (naam kuch bhi ho)</label>
+        <div class="prow"><span class="nm">Naam</span><input id="cName" placeholder="jaise: Kimi / Mistral / Cerebras"></div>
+        <div class="prow" style="margin-top:6px"><span class="nm">Base URL</span><input id="cBase" placeholder="https://api.example.com/v1"></div>
+        <div class="prow" style="margin-top:6px"><span class="nm">Model</span><input id="cModel" placeholder="model-name"></div>
+        <div class="prow" style="margin-top:6px"><span class="nm">Key</span><input id="cKey" type="password" placeholder="API key"></div>
+        <button id="addProv" style="margin-top:8px;width:100%;background:var(--blue);color:#04101f">API jodo</button>
+        <div class="msg info show" id="cMsg" style="margin-top:8px">OpenAI-format wala koi bhi API chalega (base URL + model + key).</div>
+      </div>
+
       <div class="prow" style="margin-top:10px">
         <button id="expKeys" style="padding:8px 12px;font-size:12.5px">keys ka backup lo</button>
         <button id="impKeys" style="padding:8px 12px;font-size:12.5px">backup wapas lao</button>
@@ -81,6 +91,19 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
   </div>
 
   <div class="card">
+    <label>System ki sehat (poora Seetal system)</label>
+    <button id="check" style="width:100%">System check karo</button>
+    <div class="msg" id="sysmsg"></div>
+    <div id="sysout"></div>
+  </div>
+
+  <div class="card">
+    <label>Tasks (Vinod ke apne kaam)</label>
+    <div class="prow"><input id="taskNew" placeholder="naya task likho"><button id="taskAdd" style="padding:10px 14px">+</button></div>
+    <div id="taskList" style="margin-top:9px"></div>
+  </div>
+
+  <div class="card">
     <div class="out" id="out"></div>
     <button id="copyCard" style="width:100%;display:none;background:var(--green);color:#06170a">Card copy karo (Seetal ko dene ke liye)</button>
   </div>
@@ -105,6 +128,9 @@ const PROVIDERS=[
   {id:"openrouter",name:"OpenRouter",kind:"openai", base:"https://openrouter.ai/api/v1",     model:"meta-llama/llama-3.3-70b-instruct:free"},
   {id:"gemini",    name:"Gemini",    kind:"gemini", base:"https://generativelanguage.googleapis.com/v1beta", model:""}
 ];
+let custom=[];
+try{ custom=JSON.parse(localStorage.getItem("vinod-custom-providers")||"[]"); }catch(e){ custom=[]; }
+
 const TOOLS=[["time_now","{}","aaj ka time"],["calc",'{"expr":"2+2"}',"ganit"],
  ["fetch_text",'{"url":"https://..."}',"allowlist se text"],["make_app",'{"name":"x.html","html":"..."}',"file banao"],
  ["notes_list","{}","notes"]];
@@ -127,29 +153,35 @@ const save=()=>{ try{ localStorage.setItem(KSTORE, JSON.stringify({keys,health,m
 const provEl=document.getElementById("prov"), msg=document.getElementById("msg"), outEl=document.getElementById("out");
 const taskEl=document.getElementById("task"), modeEl=document.getElementById("mode"), selEl=document.getElementById("modelSel");
 
-PROVIDERS.forEach(p=>{
-  const row=document.createElement("div"); row.className="prow";
-  const saved=keys[p.id]||"";
-  const hint = saved ? ("saved: ••••"+saved.slice(-4)+" (nayi key daalne par badal jayegi)") : "API key paste karo";
-  row.innerHTML=`<span class="nm">${p.name}</span>
-    <input id="k-${p.id}" type="password" placeholder="${esc(hint)}" value="">
-    <span class="st" id="s-${p.id}">—</span>`;
-  provEl.appendChild(row);
-  row.querySelector("#k-"+p.id).onchange=e=>{
-    const v=e.target.value.trim();
-    if(v){ keys[p.id]=v; health[p.id]=undefined; save(); }
-    else if(!keys[p.id]){ /* kuch nahi */ }
-    paint();
-  };
-});
+function allProviders(){ return PROVIDERS.concat(custom.map(c=>({id:c.id,name:c.name,kind:"openai",base:c.base,model:c.model}))); }
+
+function renderProvRows(){
+  provEl.innerHTML="";
+  allProviders().forEach(p=>{
+    const row=document.createElement("div"); row.className="prow";
+    const saved=keys[p.id]||"";
+    const hint = saved ? ("saved: ••••"+saved.slice(-4)+" (nayi key daalne par badal jayegi)") : "API key paste karo";
+    row.innerHTML=`<span class="nm">${p.name}</span>
+      <input id="k-${p.id}" type="password" placeholder="${esc(hint)}" value="">
+      <span class="st" id="s-${p.id}">—</span>`;
+    provEl.appendChild(row);
+    row.querySelector("#k-"+p.id).onchange=e=>{
+      const v=e.target.value.trim();
+      if(v){ keys[p.id]=v; health[p.id]=undefined; save(); }
+      paint();
+    };
+  });
+}
+renderProvRows();
 function paint(){
-  PROVIDERS.forEach(p=>{
+  const prov=allProviders();
+  prov.forEach(p=>{
     const el=document.getElementById("s-"+p.id); if(!el) return;
     const h=health[p.id];
     el.textContent = keys[p.id] ? (h==="ok"?"chalu":h==="bad"?"fail":"saved ✓") : "—";
     el.className="st "+(h==="ok"?"ok":h==="bad"?"bad":"");
   });
-  const opts=PROVIDERS.filter(p=>keys[p.id]).map(p=>`<option value="${p.id}">${p.name}${models[p.id]?" · "+models[p.id]:""}</option>`).join("");
+  const opts=prov.filter(p=>keys[p.id]).map(p=>`<option value="${p.id}">${p.name}${models[p.id]?" · "+models[p.id]:""}</option>`).join("");
   selEl.innerHTML='<option value="">(apne aap)</option>'+opts;
 }
 paint();
@@ -248,8 +280,88 @@ document.getElementById("run").onclick=async()=>{
   btn.disabled=false; btn.textContent="Kaam shuru karo";
 };
 
+document.getElementById("addProv").onclick=()=>{
+  const name=document.getElementById("cName").value.trim();
+  const base=document.getElementById("cBase").value.trim();
+  const model=document.getElementById("cModel").value.trim();
+  const key=document.getElementById("cKey").value.trim();
+  const m=document.getElementById("cMsg");
+  if(!name||!base||!model||!key){ m.className="msg show bad"; m.textContent="Naam, base URL, model aur key — chaaron chahiye."; return; }
+  if(!/^https?:\/\//.test(base)){ m.className="msg show bad"; m.textContent="Base URL http(s) se shuru hona chahiye."; return; }
+  const id="c_"+name.toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,12)+"_"+Date.now().toString().slice(-4);
+  custom.push({id,name,base,model});
+  keys[id]=key;
+  try{ localStorage.setItem("vinod-custom-providers", JSON.stringify(custom)); }catch(e){}
+  save(); renderProvRows(); paint();
+  m.className="msg show ok"; m.textContent=name+" jud gaya — ab list me aayega.";
+  document.getElementById("cName").value=""; document.getElementById("cBase").value="";
+  document.getElementById("cModel").value=""; document.getElementById("cKey").value="";
+};
+
+/* ---------- system check ---------- */
+const SYS=[
+  ["3D Cartoon Studio","../film3d/"],
+  ["Film Maker","../film/"],
+  ["Free Creators Hub","../free/"],
+  ["Dev Stack","../dev/"],
+  ["Seetal Agent","../agent-simple/live/"],
+  ["Hub (versions)","../hub/"],
+  ["Voices manifest","../sounds/voices/manifest.json"],
+  ["Sounds readme","../sounds/README.md"]
+];
+document.getElementById("check").onclick=async()=>{
+  const btn=document.getElementById("check"); btn.disabled=true; btn.textContent="Check ho raha hai…";
+  const box=document.getElementById("sysout"); box.innerHTML="";
+  const sm=document.getElementById("sysmsg"); sm.className="msg info show"; sm.textContent="Har system ko chhua ja raha hai…";
+  const rows=[], weak=[];
+  for(const [name,url] of SYS){
+    const t0=performance.now();
+    let ok=false, size=0, note="";
+    try{
+      const r=await fetch(url+"?v="+Date.now(),{cache:"no-store"});
+      size=(await r.text()).length;
+      ok=r.ok;
+      if(!r.ok) note="HTTP "+r.status;
+    }catch(e){ note=e.message.slice(0,40); }
+    const ms=Math.round(performance.now()-t0);
+    rows.push({name,url,ok,size,ms,note});
+    if(!ok) weak.push(name+" — khulta nahi ("+(note||"?")+")");
+    else if(ms>2500) weak.push(name+" — dheema ("+ms+"ms)");
+    else if(size<400) weak.push(name+" — khaali/short ("+size+" chars)");
+  }
+  box.innerHTML=rows.map(r=>`<div class="b ${r.ok?"a":"t"}">${r.ok?"✓":"✗"} <b>${esc(r.name)}</b> — ${r.ok?r.size+" chars, "+r.ms+"ms":"FAIL: "+esc(r.note)}</div>`).join("");
+  const keysN=Object.keys(keys).filter(k=>keys[k]).length;
+  if(keysN===0) weak.push("koi API key nahi — Vinod kaam nahi kar payega");
+  if(!rows.find(r=>r.name==="Voices manifest"&&r.ok)) weak.push("natural awaaz ka manifest nahi mila — film ki awaaz robotic rahegi");
+  sm.className="msg show "+(weak.length?"bad":"ok");
+  sm.textContent = weak.length ? ("Kamzor hisse ("+weak.length+"):\n• "+weak.join("\n• ")) : "Sab theek — koi kamzor hissa nahi mila.";
+  try{ localStorage.setItem("vinod-last-check", JSON.stringify({at:new Date().toISOString(),rows,weak})); }catch(e){}
+  btn.disabled=false; btn.textContent="System check karo";
+};
+
+/* ---------- tasks ---------- */
+let tasks=[];
+try{ tasks=JSON.parse(localStorage.getItem("vinod-tasks")||"[]"); }catch(e){ tasks=[]; }
+function paintTasks(){
+  const el=document.getElementById("taskList");
+  el.innerHTML = tasks.length ? tasks.map((t,i)=>`<div class="b t" style="display:flex;gap:8px;align-items:center">
+      <input type="checkbox" data-i="${i}" ${t.done?"checked":""} style="width:auto">
+      <span style="${t.done?"opacity:.5;text-decoration:line-through":""}">${esc(t.t)}</span></div>`).join("")
+    : '<div class="b t">Abhi koi task nahi. Upar likh kar + dabao.</div>';
+  el.querySelectorAll("input[type=checkbox]").forEach(cb=>cb.onchange=e=>{
+    tasks[+e.target.dataset.i].done=e.target.checked;
+    localStorage.setItem("vinod-tasks", JSON.stringify(tasks)); paintTasks();
+  });
+}
+document.getElementById("taskAdd").onclick=()=>{
+  const v=document.getElementById("taskNew").value.trim(); if(!v) return;
+  tasks.push({t:v,done:false}); localStorage.setItem("vinod-tasks", JSON.stringify(tasks));
+  document.getElementById("taskNew").value=""; paintTasks();
+};
+paintTasks();
+
 document.getElementById("expKeys").onclick=()=>{
-  const data=JSON.stringify({keys,models,health},null,2);
+  const data=JSON.stringify({keys,models,health,custom,tasks},null,2);
   const blob=new Blob([data],{type:"application/json"});
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a"); a.href=url; a.download="vinod-keys-backup.json";
@@ -263,6 +375,8 @@ document.getElementById("impFile").onchange=async (e)=>{
     const j=JSON.parse(await f.text());
     if(j.keys) Object.assign(keys,j.keys);
     if(j.models) Object.assign(models,j.models||{});
+    if(Array.isArray(j.custom)){ custom=j.custom; localStorage.setItem("vinod-custom-providers",JSON.stringify(custom)); }
+    if(Array.isArray(j.tasks)){ tasks=j.tasks; localStorage.setItem("vinod-tasks",JSON.stringify(tasks)); paintTasks(); }
     save(); paint();
     show("ok","Backup wapas aa gaya — "+Object.keys(keys).length+" keys mili.");
   }catch(err){ show("bad","Backup padha nahi gaya: "+err.message); }
