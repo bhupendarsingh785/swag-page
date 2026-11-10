@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Seetal 3D Cartoon Studio V5 Hybrid: AI story planning, editable scenes, imported GLB characters and phone-side video rendering.">
-<title>Seetal 3D Cartoon Studio V6 — Hybrid Edition</title>
+<title>Seetal 3D Cartoon Studio V7 — Auto Edition</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -38,32 +38,26 @@ canvas{width:100%;height:100%;display:block}
 .shots{margin-top:10px;font-size:12.5px;color:var(--dim);max-height:120px;overflow:auto}
 .shots div{padding:5px 0;border-bottom:1px dashed var(--line)}
 .foot{color:var(--dim);font-size:12.5px;margin-top:14px;line-height:1.6}
+.adv-sum{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11px;letter-spacing:.08em;color:var(--dim)}
 #dl a{display:block;margin-top:10px;padding:12px;border-radius:10px;background:var(--blue);color:#04101f;font-weight:800;text-align:center;text-decoration:none}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Seetal 3D Cartoon Studio <span style="font-size:12px;color:var(--green);font-family:'Azeret Mono',monospace">V5 HYBRID</span></h1>
-  <div class="sub">AI director + editable 3D scenes + imported cartoon models + Hindi voice + phone rendering.</div>
+  <h1>Seetal 3D Cartoon Studio <span style="font-size:12px;color:var(--green);font-family:'Azeret Mono',monospace">V7 AUTO</span></h1>
+  <div class="sub">Bas kahani likho aur ek button dabao — scene, character, camera, awaaz sab khud set hoga.</div>
 
   <div class="card">
-    <label>Kahani</label>
-    <textarea id="topic">Ek ladka jungle se darta hai. Aage jaakar use ek gufa milti hai. Wahan ek ladki milti hai. Woh usse bachata hai aur dosti ho jaati hai.</textarea>
-    <div class="row">
-      <div style="flex:1;min-width:100px"><label>Shots</label>
-        <select id="nshots"><option>3</option><option selected>4</option><option>5</option><option>8</option><option>10</option><option>12</option></select></div>
-      <div style="flex:1;min-width:100px"><label>Kam se kam har shot</label>
-        <select id="secs"><option value="4000">4 sec</option><option value="5000" selected>5 sec</option><option value="6000">6 sec</option></select></div>
-    </div>
-    <button class="go" id="make">1. Scene plan banao (AI)</button>
-    <div class="row"><button id="demo">Demo plan (bina key ke)</button></div>
+    <label>Kahani likho</label>
+    <textarea id="topic" style="min-height:110px">Ek ladka jungle se darta hai. Aage jaakar use ek gufa milti hai. Wahan ek ladki milti hai. Woh usse bachata hai aur dosti ho jaati hai.</textarea>
+    <button class="go" id="auto" style="font-size:16px;padding:16px">🎬 Film banao (automatic)</button>
     <div class="msg" id="msg1"></div>
+    <div class="msg info show" id="autoHint">Bas itna kaafi hai — scene, character, camera, action aur awaaz sab kahani se khud tay hoga.</div>
     <div class="shots" id="shots"></div>
   </div>
 
-
-  <div class="card v5-card">
-    <div class="v5-heading"><span>V5 CHARACTER WORKSHOP</span><span class="v5-chip">HYBRID</span></div>
+  <details class="card v5-card"><summary class="adv-sum">ADVANCED — apna 3D model lagana (optional)</summary>
+    <div class="v5-heading" style="margin-top:10px"><span>CHARACTER WORKSHOP</span><span class="v5-chip">HYBRID</span></div>
     <p class="v5-help">TV-cartoon quality ke liye apna rigged 3D character (.glb / .gltf) import karein. Model aapke phone/browser mein load hota hai; model file kisi server par upload nahi hoti.</p>
     <div class="v5-grid">
       <div>
@@ -82,11 +76,11 @@ canvas{width:100%;height:100%;display:block}
       <button id="clearModel" type="button">Remove imported model</button>
       <span id="modelStatus" class="v5-status">Built-in character active</span>
     </div>
-    <p class="v5-note">Best result: rigged humanoid GLB with walk / idle / run animation clips. Static GLB bhi import hoga, lekin usmein built-in walk cycle nahi hogi.</p>
-  </div>
+    <p class="v5-note">Best result: rigged humanoid GLB with walk / idle / run animation clips.</p>
+  </details>
 
-  <div class="card v5-card">
-    <div class="v5-heading"><span>SCENE TIMELINE & PROJECT</span><span class="v5-chip">EDITABLE</span></div>
+  <details class="card v5-card"><summary class="adv-sum">ADVANCED — scene edit / save / load (optional)</summary>
+    <div class="v5-heading" style="margin-top:10px"><span>SCENE TIMELINE</span><span class="v5-chip">EDITABLE</span></div>
     <div class="v5-row">
       <button id="addShot" type="button">＋ Add scene</button>
       <button id="saveProject" type="button">Save project JSON</button>
@@ -94,15 +88,17 @@ canvas{width:100%;height:100%;display:block}
       <input id="loadProjectFile" type="file" accept=".json,application/json" hidden>
     </div>
     <div id="timeline" class="v5-timeline"><div class="v5-note">Pehle AI plan ya Demo plan banayein. Phir yahan har scene edit kar sakte hain.</div></div>
-    <div class="v5-note">Har scene ka dialogue, subtitle, location, character action aur camera edit kiya ja sakta hai. Long film ke liye scenes ko parts mein save karke alag-alag render karein.</div>
-  </div>
+    <div class="v5-note">Har scene ka dialogue, subtitle, location, action aur camera edit kiya ja sakta hai.</div>
+  </details>
 
   <div class="card">
     <div class="stage"><canvas id="stage" width="720" height="1280"></canvas><canvas id="gl" width="720" height="1280"></canvas></div>
-    <div class="status"><span>3D: <b id="st3d">—</b></span><span>Character: <b id="stchar">—</b></span><span>Awaaz: <b id="stvoice">—</b></span><span>AI: <b id="stai">—</b></span></div>
+    <details style="margin-top:8px"><summary class="adv-sum">technical details</summary>
+      <div class="status"><span>3D: <b id="st3d">—</b></span><span>Character: <b id="stchar">—</b></span><span>Awaaz: <b id="stvoice">—</b></span><span>AI: <b id="stai">—</b></span></div>
+    </details>
     <div class="row">
-      <button id="play">2. Film chalao</button>
-      <button id="rec">3. Record + download</button>
+      <button id="play">▶️ Film dekho</button>
+      <button id="rec">⬇️ Video banao</button>
       <button id="stopbtn" style="display:none">Roko</button>
     </div>
     <div class="msg" id="msg2"></div>
@@ -401,10 +397,14 @@ async function prefetchAll(){
   await Promise.all([worker(),worker(),worker(),worker()]);
   return {want:texts.length, got};
 }
-function playBuffer(audio){
+const VOICE={boy:{rate:1.06},girl:{rate:1.12},man:{rate:0.94},robot:{rate:1.0},narrator:{rate:0.9},narratorhindi:{rate:0.9}};
+function voiceRate(who){ const k=String(who||"").toLowerCase().trim(); return (VOICE[k]||{rate:1.0}).rate; }
+
+function playBuffer(audio, rate){
   const ac=audioCtx();
   if(currentAudio){ try{currentAudio.stop();}catch(e){} }
   const src=ac.createBufferSource(); src.buffer=audio;
+  src.playbackRate.value=rate||1;
   const g=ac.createGain(); g.gain.value=1.0;
   src.connect(g); g.connect(ac.destination); if(audioDest) g.connect(audioDest);
   src.start();
@@ -612,25 +612,46 @@ function applyShots(list,msgText){
   show(msg1,"ok",shots.length+" shots taiyar. "+(msgText||"")+" Ab 2 ya 3 dabao (awaaz chalne se pehle download hogi).");
 }
 
-document.getElementById("make").onclick=async ()=>{
+async function makePlan(){
   const story=document.getElementById("topic").value.trim();
-  if(!story){ show(msg1,"bad","Pehle kahani likho."); return; }
-  if(!init3D()){ show(msg1,"bad","3D chalu nahi hua — page refresh karo ya browser update karo."); return; }
-  const n=document.getElementById("nshots").value;
+  if(!story) throw new Error("Pehle kahani likho.");
+  if(!init3D()) throw new Error("3D chalu nahi hua — page refresh karo ya browser update karo.");
+  const n=document.getElementById("nshots")?document.getElementById("nshots").value:"4";
   show(msg1,"info","Director plan bana raha hai…");
-  try{
-    const raw=await askAI("Tum 3D cartoon film ke director ho. Sirf JSON do.", `Kahani: "${story}"
+  const raw=await askAI("Tum 3D cartoon film ke director ho. Sirf JSON do.", `Kahani: "${story}"
 Ise ${n} shots me todo (3D cartoon).
 Har shot: {"text":"subtitle 6-8 shabd Hinglish","say":"dialogue ek chhoti line (max 12 shabd)","speaker":"Boy|Girl|Narrator",
 "scene":"jungle|cave|night|river","hero":"boy|girl|man|robot","partner":"girl|boy|(khaali)",
 "hero_action":"walk|run|idle|scared|happy|wave|jump|dance|point","partner_action":"walk|run|idle|scared|happy|wave|jump|dance|point","cam":0}
 cam: 0=dolly in, 1=side, 2=high wide, 3=angle.
 Sirf JSON: {"title":"...","shots":[...]}`);
-    const d=parseJSON(raw);
-    applyShots(d.shots,"");
-  }catch(e){ show(msg1,"bad","Ruk gaya: "+e.message); }
+  const d=parseJSON(raw);
+  applyShots(d.shots,"");
+  return d;
+}
+
+/* ek button: plan → awaaz → record → download */
+document.getElementById("auto").onclick=async()=>{
+  const btn=document.getElementById("auto");
+  if(running) return;
+  btn.disabled=true; btn.textContent="Ban rahi hai… (1-2 minute)";
+  const h=document.getElementById("autoHint"); if(h) h.classList.remove("show");
+  try{
+    if(!init3D()) throw new Error("3D chalu nahi hua — page refresh karo.");
+    if(!shots.length){
+      try{ await makePlan(); }
+      catch(e){ applyShots(DEMO, "(demo plan — AI ke bina)"); }
+    }
+    await playFilm(true);
+  }catch(e){
+    show(msg1,"bad","Ruk gaya: "+e.message);
+  }finally{
+    btn.disabled=false; btn.textContent="🎬 Film banao (automatic)";
+  }
 };
-document.getElementById("demo").onclick=()=>{
+
+const demoBtn=document.getElementById("demo");
+if(demoBtn) demoBtn.onclick=()=>{
   if(!init3D()){ show(msg1,"bad","3D chalu nahi hua — page refresh karo ya browser update karo."); return; }
   try{ applyShots(DEMO,"(demo plan)"); }catch(e){ show(msg1,"bad","Ruk gaya: "+e.message); }
 };
@@ -652,7 +673,8 @@ async function playFilm(record){
   if(running) return; running=true; stopFlag=false;
   dlBox.innerHTML="";
   await keepAwake();
-  const per=parseInt(document.getElementById("secs").value,10);
+  const secsEl=document.getElementById("secs");
+  const per=secsEl?parseInt(secsEl.value,10):5000;
   try{
     audioCtx();                                   // click ke andar hi banao
     try{ await actx.resume(); }catch(e){}
@@ -702,7 +724,7 @@ async function playFilm(record){
       let dur=per, speakMs=0;
       if(s.say){
         const audio=voiceCache.get(s.say);
-        if(audio){ playBuffer(audio); speakMs=audio.duration*1000; dur=Math.max(per,speakMs+900); }
+        if(audio){ playBuffer(audio, voiceRate(s.speaker)); speakMs=audio.duration*1000; dur=Math.max(per,speakMs+900); }
         else{
           missing++;
           speakMs=Math.min(7000,s.say.length*95); dur=Math.max(per,speakMs+900);
