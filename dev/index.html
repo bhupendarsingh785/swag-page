@@ -32,6 +32,8 @@ h2{font-size:14px;margin:24px 0 9px;font-family:"Azeret Mono",monospace;letter-s
 .tag{font-family:"Azeret Mono",monospace;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:99px;border:1px solid var(--line);color:var(--dim)}
 .tag.conn{background:var(--green);border-color:var(--green);color:#06170a;font-weight:700}
 .tag.gpu{background:rgba(224,164,74,.15);border-color:var(--amber);color:var(--amber)}
+.tag.auth{background:rgba(224,164,74,.15);border-color:var(--amber);color:var(--amber)}
+.tag.key{background:rgba(100,181,246,.15);border-color:var(--blue);color:var(--blue)}
 .foot{color:var(--dim);font-size:12.5px;margin-top:24px;line-height:1.6;border-top:1px solid var(--line);padding-top:14px}
 </style>
 </head>
@@ -69,13 +71,13 @@ const D=[
  ["Lovable","https://lovable.dev","App banao bolkar (free tier)","Code + AI",""],
  ["StackBlitz","https://stackblitz.com","Browser IDE, free","Code + AI",""],
  ["CodeSandbox","https://codesandbox.io","Browser IDE + hosting","Code + AI",""],
- ["Replit","https://replit.com","Browser me code + host — juda hua (paid publish)","Code + AI","conn"],
+ ["Replit","https://replit.com","Browser me code + host — juda hua (publish paid plan maangta hai)","Code + AI","conn"],
  ["GitHub Codespaces","https://github.com/features/codespaces","Cloud dev machine (free minutes)","Code + AI",""],
 
  ["GitHub Pages","https://pages.github.com","Free static hosting — hamara sab kuch yahin","Hosting","conn"],
  ["Vercel","https://vercel.com","Free static + serverless","Hosting",""],
  ["Netlify","https://netlify.com","Free hosting + forms — juda hua","Hosting","conn"],
- ["Cloudflare Pages","https://pages.cloudflare.com","Free hosting + Workers","Hosting","conn"],
+ ["Cloudflare Pages","https://pages.cloudflare.com","Free hosting + Workers — account authorize karna baaki","Hosting","auth"],
  ["Render","https://render.com","Free web services","Hosting",""],
  ["Railway","https://railway.app","Deploy backend fast","Hosting",""],
  ["Fly.io","https://fly.io","Small machines worldwide","Hosting",""],
@@ -100,24 +102,24 @@ const D=[
  ["Lighthouse","https://developer.chrome.com/docs/lighthouse","Speed + accessibility audit","Test + QA",""],
  ["axe DevTools","https://www.deque.com/axe/","Accessibility check","Test + QA",""],
  ["k6","https://k6.io","Load testing free","Test + QA",""],
- ["Sentry","https://sentry.io","Errors + performance — juda hua (auth baaki)","Test + QA","conn"],
+ ["Sentry","https://sentry.io","Errors + performance — connect card se authorize karna hai","Test + QA","auth"],
 
  ["GitHub Actions","https://github.com/features/actions","Free CI/cron — juda hua","Automation","conn"],
  ["n8n","https://n8n.io","Workflow automation, self-host free","Automation",""],
  ["Zapier","https://zapier.com","Apps jodo (free tier)","Automation",""],
  ["cron-job.org","https://cron-job.org","Free URL cron","Automation",""],
- ["Apify","https://apify.com","Scrapers + actors — juda hua (auth baaki)","Automation","conn"],
- ["Firecrawl","https://firecrawl.dev","Website ko markdown me — juda hua (auth baaki)","Automation","conn"],
+ ["Apify","https://apify.com","Scrapers + actors — authorize karna baaki","Automation","auth"],
+ ["Firecrawl","https://firecrawl.dev","Website ko markdown me — authorize karna baaki","Automation","auth"],
  ["Browserbase","https://browserbase.com","Cloud browser automation","Automation",""],
 
  ["Ollama","https://ollama.com","Apne laptop par LLM — free","Local + GPU","gpu"],
  ["LM Studio","https://lmstudio.ai","GUI me local models","Local + GPU","gpu"],
  ["llama.cpp","https://github.com/ggerganov/llama.cpp","CPU par bhi model chalao","Local + GPU","gpu"],
  ["ComfyUI","https://github.com/comfyanonymous/ComfyUI","Local image/video gen","Local + GPU","gpu"],
- ["Kaggle","https://www.kaggle.com","Free GPU 30 ghante/saptah","Local + GPU","conn"],
+ ["Kaggle","https://www.kaggle.com","Free GPU 30 ghante/saptah — account tumhara banega","Local + GPU","key"],
  ["Google Colab","https://colab.research.google.com","Free GPU notebook","Local + GPU",""],
  ["Hugging Face","https://huggingface.co","Models + free Spaces","Local + GPU",""],
- ["Modal","https://modal.com","$30/mahina free GPU — juda hua (script ready)","Local + GPU","conn"],
+ ["Modal","https://modal.com","$30/mahina free GPU — script ready, deploy karna baaki","Local + GPU","key"],
 
  ["MDN","https://developer.mozilla.org","Web docs ka sach","Seekho",""],
  ["freeCodeCamp","https://www.freecodecamp.org","Free coding course + certificate","Seekho",""],
@@ -136,7 +138,7 @@ CATS.forEach(c=>{
   b.onclick=()=>{ cat=c; [...chipsEl.children].forEach(x=>x.classList.toggle("on",x===b)); render(); };
   chipsEl.appendChild(b);
 });
-const TAG={conn:"juda hua",gpu:"GPU"};
+const TAG={conn:"juda hua",gpu:"GPU",auth:"auth baaki",key:"key chahiye"};
 const SYN={"Backend + DB":"database db sql backend server api","Code + AI":"editor code ai coding ide","Test + QA":"test testing qa check automation",
  "Automation":"automation cron workflow scraper","Local + GPU":"gpu local model llm ai","Seekho":"learn docs tutorial course","Hosting":"host deploy site server"};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
