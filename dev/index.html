@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dev Stack — free coding systems</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b0f14;--surface:#141a21;--surface2:#1d252e;--line:#2a3540;--text:#e8f0f7;--dim:#8ea0b2;
+ --green:#4caf50;--green-bg:#12241a;--blue:#64b5f6;--amber:#e0a44a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;font-size:15px;line-height:1.5;
+ background-image:radial-gradient(700px 380px at 85% -10%, rgba(100,181,246,.12), transparent 60%),radial-gradient(600px 300px at 0% 0%, rgba(76,175,80,.10), transparent 60%);
+ background-repeat:no-repeat}
+.wrap{max-width:880px;margin:0 auto;padding:20px 16px 70px}
+h1{font-size:24px;margin:0 0 4px;font-weight:800;letter-spacing:-.01em}
+.sub{color:var(--dim);font-size:14px;margin-bottom:16px}
+.controls{position:sticky;top:0;z-index:20;padding:10px 0;background:rgba(11,15,20,.93);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+input{width:100%;padding:11px 13px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--text);font-family:inherit;font-size:14.5px;outline:none}
+input:focus{border-color:var(--blue)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.chip{font-family:"Azeret Mono",monospace;font-size:11px;padding:5px 10px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--dim);cursor:pointer}
+.chip.on{background:var(--blue);border-color:var(--blue);color:#04101f;font-weight:700}
+h2{font-size:14px;margin:24px 0 9px;font-family:"Azeret Mono",monospace;letter-spacing:.08em;color:var(--dim);text-transform:uppercase}
+.card{display:block;text-decoration:none;color:inherit;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--line);
+ border-radius:11px;padding:12px 14px;margin-bottom:9px;transition:.15s}
+.card:hover{border-left-color:var(--blue);transform:translateX(2px)}
+.card.conn{border-left-color:var(--green);background:var(--green-bg)}
+.card .t{font-weight:700;font-size:15.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.card .d{color:var(--dim);font-size:13.5px;margin-top:3px}
+.tag{font-family:"Azeret Mono",monospace;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:99px;border:1px solid var(--line);color:var(--dim)}
+.tag.conn{background:var(--green);border-color:var(--green);color:#06170a;font-weight:700}
+.tag.gpu{background:rgba(224,164,74,.15);border-color:var(--amber);color:var(--amber)}
+.foot{color:var(--dim);font-size:12.5px;margin-top:24px;line-height:1.6;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Dev Stack</h1>
+  <div class="sub">Free coding systems — editor, hosting, database, testing, automation. <b style="color:var(--green)">juda hua</b> matlab woh mere paas pehle se hai.</div>
+
+  <div class="controls">
+    <input id="q" placeholder="Search: editor, deploy, database, test…" autocomplete="off">
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div id="list"></div>
+
+  <div class="foot">
+    Free tier ki limits badalti rehti hain — har link par ek baar dekh lena. GPU wale (Ollama, ComfyUI, llama.cpp) apne laptop par chalte hain, cloud wale Kaggle/Modal se.
+  </div>
+</div>
+
+<script>
+const D=[
+ // [name, url, note, category, tag]
+ ["GitHub","https://github.com","Code, issues, Actions, Pages — juda hua","Code + AI","conn"],
+ ["VS Code","https://code.visualstudio.com","Free editor, extensions","Code + AI",""],
+ ["Cursor","https://cursor.com","AI editor (free tier)","Code + AI",""],
+ ["Windsurf","https://windsurf.com","AI editor (free tier)","Code + AI",""],
+ ["Zed","https://zed.dev","Fast open-source editor","Code + AI",""],
+ ["Continue.dev","https://continue.dev","VS Code me free AI coding assistant","Code + AI",""],
+ ["Cline","https://cline.bot","Agent jo editor me code likhta hai","Code + AI",""],
+ ["Aider","https://aider.chat","Terminal AI pair-programmer","Code + AI",""],
+ ["OpenHands","https://github.com/All-Hands-AI/OpenHands","Open-source coding agent","Code + AI",""],
+ ["bolt.new","https://bolt.new","Browser me app banao (free credits)","Code + AI",""],
+ ["v0","https://v0.dev","UI banao (free credits)","Code + AI",""],
+ ["Lovable","https://lovable.dev","App banao bolkar (free tier)","Code + AI",""],
+ ["StackBlitz","https://stackblitz.com","Browser IDE, free","Code + AI",""],
+ ["CodeSandbox","https://codesandbox.io","Browser IDE + hosting","Code + AI",""],
+ ["Replit","https://replit.com","Browser me code + host — juda hua (paid publish)","Code + AI","conn"],
+ ["GitHub Codespaces","https://github.com/features/codespaces","Cloud dev machine (free minutes)","Code + AI",""],
+
+ ["GitHub Pages","https://pages.github.com","Free static hosting — hamara sab kuch yahin","Hosting","conn"],
+ ["Vercel","https://vercel.com","Free static + serverless","Hosting",""],
+ ["Netlify","https://netlify.com","Free hosting + forms — juda hua","Hosting","conn"],
+ ["Cloudflare Pages","https://pages.cloudflare.com","Free hosting + Workers","Hosting","conn"],
+ ["Render","https://render.com","Free web services","Hosting",""],
+ ["Railway","https://railway.app","Deploy backend fast","Hosting",""],
+ ["Fly.io","https://fly.io","Small machines worldwide","Hosting",""],
+ ["Deno Deploy","https://deno.com/deploy","Edge JS, free","Hosting",""],
+ ["Surge.sh","https://surge.sh","CLI se static site","Hosting",""],
+
+ ["Supabase","https://supabase.com","Postgres + auth + storage — juda hua","Backend + DB","conn"],
+ ["Firebase","https://firebase.google.com","DB + auth + hosting","Backend + DB",""],
+ ["Neon","https://neon.tech","Serverless Postgres free","Backend + DB",""],
+ ["Turso","https://turso.tech","Edge SQLite","Backend + DB",""],
+ ["Upstash","https://upstash.com","Serverless Redis/Kafka free","Backend + DB",""],
+ ["Appwrite","https://appwrite.io","Open-source backend","Backend + DB",""],
+ ["PocketBase","https://pocketbase.io","Ek file me backend","Backend + DB",""],
+ ["MongoDB Atlas","https://mongodb.com/atlas","Free 512MB cloud DB","Backend + DB",""],
+ ["Prisma","https://prisma.io","Type-safe ORM, free","Backend + DB",""],
+ ["Drizzle ORM","https://orm.drizzle.team","Lightweight SQL ORM","Backend + DB",""],
+
+ ["Playwright","https://playwright.dev","Browser automation + testing","Test + QA",""],
+ ["Puppeteer","https://pptr.dev","Headless Chrome","Test + QA",""],
+ ["Vitest","https://vitest.dev","Fast unit tests","Test + QA",""],
+ ["Jest","https://jestjs.io","JS testing","Test + QA",""],
+ ["Lighthouse","https://developer.chrome.com/docs/lighthouse","Speed + accessibility audit","Test + QA",""],
+ ["axe DevTools","https://www.deque.com/axe/","Accessibility check","Test + QA",""],
+ ["k6","https://k6.io","Load testing free","Test + QA",""],
+ ["Sentry","https://sentry.io","Errors + performance — juda hua (auth baaki)","Test + QA","conn"],
+
+ ["GitHub Actions","https://github.com/features/actions","Free CI/cron — juda hua","Automation","conn"],
+ ["n8n","https://n8n.io","Workflow automation, self-host free","Automation",""],
+ ["Zapier","https://zapier.com","Apps jodo (free tier)","Automation",""],
+ ["cron-job.org","https://cron-job.org","Free URL cron","Automation",""],
+ ["Apify","https://apify.com","Scrapers + actors — juda hua (auth baaki)","Automation","conn"],
+ ["Firecrawl","https://firecrawl.dev","Website ko markdown me — juda hua (auth baaki)","Automation","conn"],
+ ["Browserbase","https://browserbase.com","Cloud browser automation","Automation",""],
+
+ ["Ollama","https://ollama.com","Apne laptop par LLM — free","Local + GPU","gpu"],
+ ["LM Studio","https://lmstudio.ai","GUI me local models","Local + GPU","gpu"],
+ ["llama.cpp","https://github.com/ggerganov/llama.cpp","CPU par bhi model chalao","Local + GPU","gpu"],
+ ["ComfyUI","https://github.com/comfyanonymous/ComfyUI","Local image/video gen","Local + GPU","gpu"],
+ ["Kaggle","https://www.kaggle.com","Free GPU 30 ghante/saptah","Local + GPU","conn"],
+ ["Google Colab","https://colab.research.google.com","Free GPU notebook","Local + GPU",""],
+ ["Hugging Face","https://huggingface.co","Models + free Spaces","Local + GPU",""],
+ ["Modal","https://modal.com","$30/mahina free GPU — juda hua (script ready)","Local + GPU","conn"],
+
+ ["MDN","https://developer.mozilla.org","Web docs ka sach","Seekho",""],
+ ["freeCodeCamp","https://www.freecodecamp.org","Free coding course + certificate","Seekho",""],
+ ["roadmap.sh","https://roadmap.sh","Kaun sa rasta — step by step","Seekho",""],
+ ["DevDocs","https://devdocs.io","Saare docs ek jagah, offline","Seekho",""],
+ ["Stack Overflow","https://stackoverflow.com","Sawaal-jawab","Seekho",""],
+ ["Postman","https://www.postman.com","API test (free tier)","Seekho",""],
+ ["Hoppscotch","https://hoppscotch.io","Browser me API test, free","Seekho",""]
+];
+
+const CATS=["Sab", ...Array.from(new Set(D.map(d=>d[3])))];
+let cat="Sab";
+const listEl=document.getElementById("list"), chipsEl=document.getElementById("chips"), qEl=document.getElementById("q");
+CATS.forEach(c=>{
+  const b=document.createElement("button"); b.className="chip"+(c==="Sab"?" on":""); b.textContent=c;
+  b.onclick=()=>{ cat=c; [...chipsEl.children].forEach(x=>x.classList.toggle("on",x===b)); render(); };
+  chipsEl.appendChild(b);
+});
+const TAG={conn:"juda hua",gpu:"GPU"};
+const SYN={"Backend + DB":"database db sql backend server api","Code + AI":"editor code ai coding ide","Test + QA":"test testing qa check automation",
+ "Automation":"automation cron workflow scraper","Local + GPU":"gpu local model llm ai","Seekho":"learn docs tutorial course","Hosting":"host deploy site server"};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function render(){
+  const q=qEl.value.trim().toLowerCase();
+  const items=D.filter(d=>(cat==="Sab"||d[3]===cat)&&(!q||(d[0]+" "+d[2]+" "+d[3]+" "+(SYN[d[3]]||"")).toLowerCase().includes(q)));
+  let html="",last=null;
+  items.forEach(d=>{
+    if(d[3]!==last){ html+=`<h2>${esc(d[3])}</h2>`; last=d[3]; }
+    const tag=d[4]?`<span class="tag ${d[4]}">${TAG[d[4]]}</span>`:"";
+    html+=`<a class="card ${d[4]==="conn"?"conn":""}" href="${esc(d[1])}" target="_blank" rel="noopener">
+      <div class="t">${esc(d[0])} ${tag}</div><div class="d">${esc(d[2])}</div></a>`;
+  });
+  listEl.innerHTML=html||'<div class="card"><div class="d">Kuch nahi mila.</div></div>';
+}
+qEl.addEventListener("input",render); render();
+</script>
+</body>
+</html>
