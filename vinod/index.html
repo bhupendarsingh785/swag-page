@@ -53,7 +53,12 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
     <details>
       <summary>MODELS &amp; KEYS (ek baar bharo — sirf isi browser me rehti hain)</summary>
       <div class="prov" id="prov" style="margin-top:10px"></div>
-      <div class="msg info show" style="margin-top:8px">Ek bhi key daalo to kaam shuru ho jayega. Jo key fail hogi, agla model apne aap try hoga.</div>
+      <div class="prow" style="margin-top:10px">
+        <button id="expKeys" style="padding:8px 12px;font-size:12.5px">keys ka backup lo</button>
+        <button id="impKeys" style="padding:8px 12px;font-size:12.5px">backup wapas lao</button>
+        <input id="impFile" type="file" accept=".json" style="display:none">
+      </div>
+      <div class="msg info show" style="margin-top:8px">Keys isi browser me hamesha ke liye rehti hain — refresh, naya version, ya doosri app kholne par bhi milengi. Ek baar backup file le lo, phir browser data saaf karne par bhi kuch nahi jayega.</div>
     </details>
   </div>
 
@@ -87,7 +92,11 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
 </div>
 
 <script>
-const KSTORE="vinod-keys-v1";
+/* Ek hi store — sab apps (Vinod, Seetal Agent, 3D studio) isi ko padhte hain.
+   Isliye naya version aane par, refresh karne par, ya doosri app kholne par
+   key dobara nahi daalni padti. */
+const KSTORE="seetal-keys-v1";
+const LEGACY="vinod-keys-v1";
 const PROVIDERS=[
   {id:"groq",      name:"Groq",      kind:"openai", base:"https://api.groq.com/openai/v1",   model:"qwen/qwen3.8-27b"},
   {id:"openai",    name:"OpenAI",    kind:"openai", base:"https://api.openai.com/v1",        model:"gpt-4o-mini"},
@@ -102,7 +111,17 @@ const TOOLS=[["time_now","{}","aaj ka time"],["calc",'{"expr":"2+2"}',"ganit"],
 const ALLOW=["raw.githubusercontent.com","en.wikipedia.org","api.github.com","data.gov.in"];
 
 let keys={}, health={}, models={}, lastCard="";
-try{ const s=JSON.parse(localStorage.getItem(KSTORE)||"{}"); keys=s.keys||{}; health=s.health||{}; models=s.models||{}; }catch(e){}
+(function loadKeys(){
+  try{ const s=JSON.parse(localStorage.getItem(KSTORE)||"{}"); keys=s.keys||{}; health=s.health||{}; models=s.models||{}; }catch(e){}
+  // purane Vinod store se keys utha kar merge karo (kuch na khoye)
+  try{
+    const old=JSON.parse(localStorage.getItem(LEGACY)||"{}");
+    if(old.keys) Object.keys(old.keys).forEach(k=>{ if(!keys[k] && old.keys[k]) keys[k]=old.keys[k]; });
+    if(old.health) Object.keys(old.health).forEach(k=>{ if(!health[k]) health[k]=old.health[k]; });
+  }catch(e){}
+  // merge ko pakka karo — ab sab kuch ek hi store me
+  try{ localStorage.setItem(KSTORE, JSON.stringify({keys,health,models})); }catch(e){}
+})();
 const save=()=>{ try{ localStorage.setItem(KSTORE, JSON.stringify({keys,health,models})); }catch(e){} };
 
 const provEl=document.getElementById("prov"), msg=document.getElementById("msg"), outEl=document.getElementById("out");
@@ -110,17 +129,24 @@ const taskEl=document.getElementById("task"), modeEl=document.getElementById("mo
 
 PROVIDERS.forEach(p=>{
   const row=document.createElement("div"); row.className="prow";
+  const saved=keys[p.id]||"";
+  const hint = saved ? ("saved: ••••"+saved.slice(-4)+" (nayi key daalne par badal jayegi)") : "API key paste karo";
   row.innerHTML=`<span class="nm">${p.name}</span>
-    <input id="k-${p.id}" type="password" placeholder="API key" value="${(keys[p.id]||"").replace(/"/g,"&quot;")}">
+    <input id="k-${p.id}" type="password" placeholder="${esc(hint)}" value="">
     <span class="st" id="s-${p.id}">—</span>`;
   provEl.appendChild(row);
-  row.querySelector("#k-"+p.id).onchange=e=>{ keys[p.id]=e.target.value.trim(); save(); paint(); };
+  row.querySelector("#k-"+p.id).onchange=e=>{
+    const v=e.target.value.trim();
+    if(v){ keys[p.id]=v; health[p.id]=undefined; save(); }
+    else if(!keys[p.id]){ /* kuch nahi */ }
+    paint();
+  };
 });
 function paint(){
   PROVIDERS.forEach(p=>{
     const el=document.getElementById("s-"+p.id); if(!el) return;
     const h=health[p.id];
-    el.textContent = keys[p.id] ? (h==="ok"?"chalu":h==="bad"?"fail":"key") : "—";
+    el.textContent = keys[p.id] ? (h==="ok"?"chalu":h==="bad"?"fail":"saved ✓") : "—";
     el.className="st "+(h==="ok"?"ok":h==="bad"?"bad":"");
   });
   const opts=PROVIDERS.filter(p=>keys[p.id]).map(p=>`<option value="${p.id}">${p.name}${models[p.id]?" · "+models[p.id]:""}</option>`).join("");
@@ -220,6 +246,26 @@ document.getElementById("run").onclick=async()=>{
     document.getElementById("copyCard").style.display="block";
   }catch(e){ show("bad", e.message); }
   btn.disabled=false; btn.textContent="Kaam shuru karo";
+};
+
+document.getElementById("expKeys").onclick=()=>{
+  const data=JSON.stringify({keys,models,health},null,2);
+  const blob=new Blob([data],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="vinod-keys-backup.json";
+  document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},3000);
+  show("ok","Backup file download ho gayi — sambhal ke rakho.");
+};
+document.getElementById("impKeys").onclick=()=>document.getElementById("impFile").click();
+document.getElementById("impFile").onchange=async (e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    const j=JSON.parse(await f.text());
+    if(j.keys) Object.assign(keys,j.keys);
+    if(j.models) Object.assign(models,j.models||{});
+    save(); paint();
+    show("ok","Backup wapas aa gaya — "+Object.keys(keys).length+" keys mili.");
+  }catch(err){ show("bad","Backup padha nahi gaya: "+err.message); }
 };
 
 document.getElementById("copyCard").onclick=async()=>{
