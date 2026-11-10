@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seetal — sab versions, ek jagah</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2" rel="stylesheet">
+<style>
+:root{--bg:#fdf8f2;--surface:#fff;--line:#e6dbcd;--line2:#cbb9a4;--text:#2a211b;--dim:#8a7768;--green:#2f7d32;--green-bg:#e8f3e6;--blue:#1c5f8a;--amber:#a86a00;--amber-bg:#fbf1de}
+@media (prefers-color-scheme:dark){:root{--bg:#1a1613;--surface:#241f1b;--line:#3a322b;--line2:#4d4239;--text:#f4ece3;--dim:#a3927f;--green:#8fce8b;--green-bg:#1f2e1e;--blue:#8dc4e8;--amber:#e0b062;--amber-bg:#2f2617}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;font-size:16.5px;line-height:1.55}
+.wrap{max-width:720px;margin:0 auto;padding:30px 18px 60px}
+h1{font-size:27px;margin:0 0 6px;font-weight:800;letter-spacing:-.01em}
+.sub{color:var(--dim);font-size:15px;margin-bottom:26px}
+.card{display:block;text-decoration:none;color:inherit;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line2);
+  border-radius:13px;padding:16px 18px;margin-bottom:12px;transition:.15s}
+.card:hover{transform:translateY(-1px);border-color:var(--blue)}
+.card.latest{border-left-color:var(--green)}
+.card.frozen{border-left-color:var(--amber)}
+.card .t{font-weight:800;font-size:17.5px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.card .d{color:var(--dim);font-size:14.5px;margin-top:4px}
+.tag{font-family:"Azeret Mono",monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:99px;border:1px solid var(--line2);color:var(--dim)}
+.tag.new{background:var(--green-bg);color:var(--green);border-color:var(--green)}
+.tag.old{background:var(--amber-bg);color:var(--amber);border-color:var(--amber)}
+.note{background:var(--surface);border:1px dashed var(--line2);border-radius:12px;padding:15px 17px;margin-top:22px;font-size:14.5px;color:var(--dim)}
+.note b{color:var(--text)}
+.foot{color:var(--dim);font-size:13px;margin-top:24px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Seetal — sab versions</h1>
+  <div class="sub">Har version ka apna pakka address. Purane link kabhi nahi tootte, purani keys kabhi nahi udti.</div>
+
+  <a class="card latest" href="../agent-simple/v2/">
+    <div class="t">Simple Agent <span class="tag new">latest</span></div>
+    <div class="d">Ek box, ek button. Nayi key daalo to purani bachi rehti hai. Fail hone par agli key apne aap.</div>
+  </a>
+
+  <a class="card frozen" href="../agent-simple/v1/">
+    <div class="t">Simple Agent v1 <span class="tag old">frozen</span></div>
+    <div class="d">Pehla wala — jaisa tha waisa hi. Yeh address hamesha chalu rahega.</div>
+  </a>
+
+  <a class="card" href="../agent/">
+    <div class="t">Advanced Agent <span class="tag">full</span></div>
+    <div class="d">5 providers, 10 tools, memory, policy box, run log — poora control panel.</div>
+  </a>
+
+  <a class="card" href="../connector/">
+    <div class="t">Connector <span class="tag">tracker</span></div>
+    <div class="d">149 systems ki list — kaun juda, kaun baaki, step-by-step rasta.</div>
+  </a>
+
+  <div class="note">
+    <b>Niyam:</b> naya version banate waqt main purane ko delete nahi karti — naya folder banta hai (v2, v3…), purana wahi rehta hai.
+    Keys aur notes ek hi jagah save hote hain, isliye naya version kholne par bhi tumhari keys wahi milti hain.
+  </div>
+
+  <div class="foot">Kuch bhi toota lage to bolo — purana version turant wapas khul jayega.</div>
+</div>
+</body>
+</html>
