@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Seetal Agent — v7 (poora error + smart model)</title>
+<title>Seetal Agent — v8 (multi-task + app banata hai)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -91,7 +91,7 @@ textarea:focus{border-color:var(--blue)}
 </head>
 <body>
 <div class="wrap">
-  <h1>Seetal Agent <span style="font-size:13px;color:var(--dim);font-family:'Azeret Mono',monospace">v7</span></h1>
+  <h1>Seetal Agent <span style="font-size:13px;color:var(--dim);font-family:'Azeret Mono',monospace">v8</span></h1>
   <div class="sub">Bas ek jagah key daalni hai — neeche hari dashed line wale box me.</div>
 
   <div class="pointer">
@@ -118,11 +118,16 @@ textarea:focus{border-color:var(--blue)}
       <div class="t">Save ki hui keys</div>
       <div id="klist"></div>
     </div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button id="expKeys" style="width:auto;margin:0;padding:8px 12px;font-size:12.5px">keys ka backup lo</button>
+      <button id="impKeys" style="width:auto;margin:0;padding:8px 12px;font-size:12.5px">backup wapas lao</button>
+      <input id="impFile" type="file" accept=".json" style="display:none">
+    </div>
   </div>
 
   <div class="step">
     <h2><span class="num">2</span> Kya karna hai</h2>
-    <textarea id="goal" placeholder="jaise: Reliance ka price lao aur note me save karo"></textarea>
+    <textarea id="goal" placeholder="ek line me ek kaam — 3 line likho to 3 kaam ek ke baad ek honge"></textarea>
     <button class="green" id="run" disabled>Chalao</button>
     <div class="bar info show" id="hint"><span class="dots"><i></i><i></i><i></i></span> pehle key test karo</div>
   </div>
@@ -130,7 +135,7 @@ textarea:focus{border-color:var(--blue)}
   <div class="out" id="out"></div>
 
   <div class="foot">
-    Keys isi browser me save hoti hain — naya version kholne par bhi bachi rehti hain. Purana version: <a href="../v6/">v6</a>, <a href="../v5/">v5</a>, <a href="../v4/">v4</a>.
+    Keys isi browser me save hoti hain — naya version kholne par bhi bachi rehti hain. Purana version: <a href="../v7/">v7</a>, <a href="../v6/">v6</a>, <a href="../v5/">v5</a>.
   </div>
 </div>
 
@@ -190,9 +195,15 @@ const POLICY=`Tum Seetal Agent ho — Swag ki madad karne wali chhoti agent.
 Sirf JSON me jawab do, koi extra text nahi:
 {"thought":"chhota soch","tool":"tool_name","args":{...}}  ya kaam poora hone par {"final":"Hinglish me saaf jawab"}.
 Ek baar me ek tool. Sirf diye gaye tools use karo. Data jhooth mat banao — tool fail ho to saaf bolo.
-Jawab Hinglish me, chhota aur seedha.`;
+Jawab Hinglish me, chhota aur seedha.
+7. Kaam bada ho to pehle chhote steps me todo, phir ek-ek tool chalao.
+8. App banana ho to make_app se poora chalta hua single-file HTML do — placeholder nahi, asli code.`;
 const TOOLS=[["time_now","{}","date/time"],["calc",'{"expr":"..."}',"ganit"],["wiki",'{"q":"..."}',"Wikipedia"],
- ["quote",'{"symbol":"..."}',"Yahoo price"],["note_save",'{"key":"...","value":"..."}',"note"],["notes_list","{}","notes"]];
+ ["quote",'{"symbol":"..."}',"Yahoo price"],["crypto",'{"coin":"bitcoin"}',"crypto price"],
+ ["http_get",'{"url":"https://..."}',"allowlist wale site se text"],
+ ["note_save",'{"key":"...","value":"..."}',"note"],["note_get",'{"key":"..."}',"note padho"],
+ ["notes_list","{}","saare notes"],
+ ["make_app",'{"name":"app.html","html":"..."}',"naya app file banao aur download do"]];
 
 const MSTORE="seetal-models-v1";
 let models={};
@@ -402,18 +413,46 @@ async function runTool(name,args){
     localStorage.setItem("seetal-notes",JSON.stringify(ns));return {saved:k};}
   if(name==="notes_list"){const ns=JSON.parse(localStorage.getItem("seetal-notes")||"{}");
     return Object.keys(ns).map(k=>({key:k,value:String(ns[k].v).slice(0,100)}));}
+  if(name==="crypto"){
+    const c=String(args.coin||"bitcoin").toLowerCase().replace(/\s+/g,"-");
+    const r=await fetch("https://api.coingecko.com/api/v3/simple/price?ids="+encodeURIComponent(c)+"&vs_currencies=inr,usd&include_24hr_change=true");
+    const j=await r.json(); if(!j[c]) throw new Error("yeh coin nahi mila: "+c);
+    return Object.assign({coin:c}, j[c]);
+  }
+  if(name==="http_get"){
+    const u=String(args.url||"");
+    if(!hostOk(u)) throw new Error("yeh host allowlist me nahi: "+u);
+    const r=await fetch("https://api.allorigins.win/raw?url="+encodeURIComponent(u));
+    const t=await r.text();
+    return {url:u, chars:t.length, text:t.slice(0,2500)};
+  }
+  if(name==="note_get"){
+    const ns=JSON.parse(localStorage.getItem("seetal-notes")||"{}");
+    const k=String(args.key||"");
+    if(!ns[k]) throw new Error("aisa note nahi: "+k);
+    return ns[k];
+  }
+  if(name==="make_app"){
+    const nm=String(args.name||"app.html").replace(/[^a-zA-Z0-9._-]/g,"_");
+    let h=String(args.html||"");
+    if(h.length<50) throw new Error("html bahut chhota hai");
+    if(!/^\s*<!DOCTYPE|^\s*<html/i.test(h)) h='<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+nm+'</title></head><body>\n'+h+'\n</body></html>';
+    const blob=new Blob([h],{type:"text/html"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download=nm; document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },4000);
+    return {saved:nm, size:h.length, note:"file download ho gayi — Downloads me dekho"};
+  }
   throw new Error("aisa tool nahi hai: "+name);
 }
 function bub(cls,text){
   const d=document.createElement("div");d.className="b "+cls;d.textContent=text;
   outEl.appendChild(d); if(d.scrollIntoView) d.scrollIntoView({behavior:"smooth",block:"nearest"}); return d;
 }
-runBtn.onclick=async()=>{
-  const goal=goalEl.value.trim(); if(!goal) return;
-  outEl.innerHTML=""; runBtn.disabled=true; runBtn.textContent="Chal raha hai…";
+async function runOne(goal){
   bub("u",goal);
   const messages=[{role:"user",content:"Kaam: "+goal+"\n\nTools: "+TOOLS.map(t=>t[0]+"("+t[1]+")").join(", ")+"\n\nSirf JSON me jawab do."}];
-  for(let i=0;i<8;i++){
+  for(let i=0;i<12;i++){
     let raw;
     try{ raw=await callModel(messages); }catch(e){ bub("a","Error: "+e.message); break; }
     let obj;
@@ -426,7 +465,42 @@ runBtn.onclick=async()=>{
     tb.textContent+="\n"+(ok?"✓ ":"✗ ")+JSON.stringify(res).slice(0,300);
     messages.push({role:"assistant",content:raw},{role:"user",content:"TOOL RESULT ("+obj.tool+"): "+JSON.stringify(res).slice(0,1500)+"\n\nAgla step JSON me."});
   }
+}
+
+
+
+runBtn.onclick=async()=>{
+  const raw=goalEl.value.trim(); if(!raw) return;
+  const tasks=raw.split("\n").map(function(t){return t.trim();}).filter(function(t){return t.length>2;});
+  outEl.innerHTML=""; runBtn.disabled=true; runBtn.textContent="Chal raha hai…";
+  for(let ti=0; ti<tasks.length; ti++){
+    if(tasks.length>1) bub("t","— kaam "+(ti+1)+"/"+tasks.length+" —");
+    await runOne(tasks[ti]);
+  }
   runBtn.disabled=false; runBtn.textContent="Chalao";
+};
+
+/* keys ka backup — kuch bhi na khoye */
+document.getElementById("expKeys").onclick=function(){
+  const data=JSON.stringify({keys:keys, models:models, health:health, notes:JSON.parse(localStorage.getItem("seetal-notes")||"{}")}, null, 2);
+  const blob=new Blob([data],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="seetal-agent-backup.json"; document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },4000);
+  setBar(testMsg,"ok","Backup file download ho gayi — isse keys kabhi nahi khoyengi.");
+};
+document.getElementById("impKeys").onclick=function(){ document.getElementById("impFile").click(); };
+document.getElementById("impFile").onchange=async function(e){
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    const j=JSON.parse(await f.text());
+    if(j.keys) Object.keys(j.keys).forEach(function(k){ keys[k]=j.keys[k]; });
+    if(j.models) Object.keys(j.models).forEach(function(k){ models[k]=j.models[k]; });
+    if(j.health) Object.keys(j.health).forEach(function(k){ health[k]=j.health[k]; });
+    if(j.notes) localStorage.setItem("seetal-notes", JSON.stringify(j.notes));
+    saveKeys(); saveModels(); paintKeys();
+    setBar(testMsg,"ok","Backup wapas aa gaya — "+Object.keys(keys).length+" keys mili.");
+  }catch(err){ setBar(testMsg,"bad","Backup file padhi nahi gayi: "+err.message); }
 };
 
 /* ---- model picker ---- */
