@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Vinod v4 — deep system manager</title>
+<title>Agent Vinod v5 — saaf samajh</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -46,7 +46,7 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
 </head>
 <body>
 <div class="wrap">
-  <h1>Agent Vinod <span style="font-size:11px;color:var(--green);font-family:'Azeret Mono',monospace">v4 DEEP</span></h1>
+  <h1>Agent Vinod <span style="font-size:11px;color:var(--green);font-family:'Azeret Mono',monospace">v5 CLEAR</span></h1>
   <div class="sub">Seetal ka worker — bada kaam karta hai, jhooth nahi bolta. Result ek "card" me deta hai jo Seetal ko wapas diya ja sakta hai.</div>
 
   <div class="card">
@@ -59,7 +59,10 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
         <div class="prow" style="margin-top:6px"><span class="nm">Base URL</span><input id="cBase" placeholder="https://api.example.com/v1"></div>
         <div class="prow" style="margin-top:6px"><span class="nm">Model</span><input id="cModel" placeholder="model-name"></div>
         <div class="prow" style="margin-top:6px"><span class="nm">Key</span><input id="cKey" type="password" placeholder="API key"></div>
-        <button id="addProv" style="margin-top:8px;width:100%;background:var(--blue);color:#04101f">API jodo</button>
+        <div class="prow" style="margin-top:8px">
+          <button id="fillProv" style="padding:8px 12px;font-size:12.5px">example bharo</button>
+          <button id="addProv" style="flex:1;background:var(--blue);color:#04101f">API jodo</button>
+        </div>
         <div class="msg info show" id="cMsg" style="margin-top:8px">OpenAI-format wala koi bhi API chalega (base URL + model + key).</div>
       </div>
 
@@ -74,7 +77,11 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
 
   <div class="card">
     <label>Kaam (Seetal ka brief)</label>
-    <textarea id="task" placeholder="Kaam: jungle wali kahani ka 6-shot plan banao&#10;Platform: web&#10;Kab tak: aaj"></textarea>
+    <textarea id="task" placeholder="Yahan apna kaam likho… (grey text sirf misaal hai, woh kaam nahi hai)"></textarea>
+    <div class="prow" style="margin-top:7px">
+      <button id="fillExample" style="padding:8px 12px;font-size:12.5px">example bharo</button>
+      <button id="clearTask" style="padding:8px 12px;font-size:12.5px">saaf karo</button>
+    </div>
     <div class="prow" style="margin-top:9px">
       <div style="flex:1;min-width:120px"><label>Mode</label>
         <select id="mode">
@@ -255,7 +262,7 @@ function bub(cls,txt){ const d=document.createElement("div"); d.className="b "+c
 
 document.getElementById("run").onclick=async()=>{
   const task=taskEl.value.trim();
-  if(!task){ show("bad","Pehle kaam likho."); return; }
+  if(!task){ show("bad","Box khaali hai — grey text sirf misaal hai. Apna kaam likho, ya 'example bharo' dabao."); return; }
   const btn=document.getElementById("run"); btn.disabled=true; btn.textContent="Kaam ho raha hai…";
   outEl.innerHTML=""; document.getElementById("copyCard").style.display="none";
   bub("u",task);
@@ -285,13 +292,33 @@ document.getElementById("run").onclick=async()=>{
   btn.disabled=false; btn.textContent="Kaam shuru karo";
 };
 
+document.getElementById("fillExample").onclick=()=>{
+  document.getElementById("task").value="Kaam: jungle wali kahani ka 6-shot plan banao (Hinglish)\nPlatform: web\nKab tak: aaj";
+  document.getElementById("task").focus();
+};
+document.getElementById("clearTask").onclick=()=>{ document.getElementById("task").value=""; };
+
+document.getElementById("fillProv").onclick=()=>{
+  document.getElementById("cName").value="Mistral";
+  document.getElementById("cBase").value="https://api.mistral.ai/v1";
+  document.getElementById("cModel").value="mistral-small-latest";
+  document.getElementById("cKey").focus();
+  const m=document.getElementById("cMsg"); m.className="msg show info";
+  m.textContent="Base URL aur model bhar diye — ab sirf apni key paste karo, phir 'API jodo'.";
+};
+
 document.getElementById("addProv").onclick=()=>{
   const name=document.getElementById("cName").value.trim();
   const base=document.getElementById("cBase").value.trim();
   const model=document.getElementById("cModel").value.trim();
   const key=document.getElementById("cKey").value.trim();
   const m=document.getElementById("cMsg");
-  if(!name||!base||!model||!key){ m.className="msg show bad"; m.textContent="Naam, base URL, model aur key — chaaron chahiye."; return; }
+  const miss=[];
+  if(!name){miss.push("Naam"); document.getElementById("cName").style.borderColor="var(--red)";} else document.getElementById("cName").style.borderColor="";
+  if(!base){miss.push("Base URL"); document.getElementById("cBase").style.borderColor="var(--red)";} else document.getElementById("cBase").style.borderColor="";
+  if(!model){miss.push("Model"); document.getElementById("cModel").style.borderColor="var(--red)";} else document.getElementById("cModel").style.borderColor="";
+  if(!key){miss.push("Key"); document.getElementById("cKey").style.borderColor="var(--red)";} else document.getElementById("cKey").style.borderColor="";
+  if(miss.length){ m.className="msg show bad"; m.textContent="Yeh khaali hai: "+miss.join(", ")+". (Grey text sirf misaal hai — asli value likho, ya 'example bharo' dabao.)"; return; }
   if(!/^https?:\/\//.test(base)){ m.className="msg show bad"; m.textContent="Base URL http(s) se shuru hona chahiye."; return; }
   const id="c_"+name.toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,12)+"_"+Date.now().toString().slice(-4);
   custom.push({id,name,base,model});
