@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seetal 3D Cartoon Studio v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--line:#30363d;--text:#e6edf3;--dim:#8b949e;
+ --green:#3fb950;--green-bg:#12261a;--red:#f85149;--amber:#d29922;--blue:#58a6ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;font-size:15px;line-height:1.5}
+.wrap{max-width:720px;margin:0 auto;padding:16px 16px 60px}
+h1{font-size:21px;margin:0 0 2px;font-weight:800}
+.sub{color:var(--dim);font-size:13.5px;margin-bottom:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+label{font-family:"Azeret Mono",monospace;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:6px}
+input,select,textarea{width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-family:inherit;font-size:14.5px}
+textarea{min-height:62px;resize:vertical}
+button{font-family:inherit;font-size:14px;font-weight:700;padding:12px 16px;border-radius:10px;border:none;background:var(--surface2);color:var(--text);cursor:pointer}
+button:hover:not(:disabled){background:var(--line)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.go{background:var(--green);color:#04170a;width:100%;margin-top:10px}
+.stage{background:#000;border-radius:12px;overflow:hidden;aspect-ratio:9/16;max-height:54vh;margin:0 auto;position:relative}
+canvas{width:100%;height:100%;display:block}
+#gl{position:absolute;left:-9999px;top:-9999px}
+.status{font-family:"Azeret Mono",monospace;font-size:10.5px;color:var(--dim);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap}
+.status b{color:var(--green)}
+.msg{margin-top:10px;padding:10px 12px;border-radius:9px;font-size:13.5px;display:none;white-space:pre-wrap}
+.msg.show{display:block}
+.msg.ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green)}
+.msg.bad{background:#2a1414;color:var(--red);border:1px solid var(--red)}
+.msg.info{background:var(--surface2);color:var(--dim);border:1px dashed var(--line)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.row button{flex:1;min-width:120px}
+.shots{margin-top:10px;font-size:12.5px;color:var(--dim);max-height:100px;overflow:auto}
+.shots div{padding:5px 0;border-bottom:1px dashed var(--line)}
+.foot{color:var(--dim);font-size:12.5px;margin-top:14px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Seetal 3D Cartoon <span style="font-size:12px;color:var(--dim);font-family:'Azeret Mono',monospace">v3</span></h1>
+  <div class="sub">Character code se bante hain — koi bahari model nahi, isliye kaali screen nahi aayegi.</div>
+
+  <div class="card">
+    <label>Kahani</label>
+    <textarea id="topic">Ek ladka jungle se darta hai. Aage jaakar use ek gufa milti hai. Wahan ek ladki milti hai. Woh usse bachata hai aur dosti ho jaati hai.</textarea>
+    <div class="row">
+      <div style="flex:1;min-width:100px"><label>Shots</label>
+        <select id="nshots"><option>3</option><option selected>4</option><option>5</option></select></div>
+      <div style="flex:1;min-width:100px"><label>Har shot</label>
+        <select id="secs"><option value="4000">4 sec</option><option value="5000" selected>5 sec</option><option value="6000">6 sec</option></select></div>
+    </div>
+    <button class="go" id="make">1. Scene plan banao</button>
+    <div class="msg" id="msg1"></div>
+    <div class="shots" id="shots"></div>
+  </div>
+
+  <div class="card">
+    <div class="stage"><canvas id="stage" width="720" height="1280"></canvas><canvas id="gl" width="720" height="1280"></canvas></div>
+    <div class="status"><span>3D: <b id="st3d">—</b></span><span>Character: <b id="stchar">—</b></span><span>Awaaz: <b id="stvoice">—</b></span></div>
+    <div class="row">
+      <button id="play">2. Film chalao</button>
+      <button id="rec">3. Record (awaaz ke saath)</button>
+    </div>
+    <div class="msg" id="msg2"></div>
+  </div>
+
+  <div class="foot">
+    Awaaz: har dialogue ki Hindi mp3 free TTS se aati hai (proxy ke raste), Web Audio se film ke saath mix hoti hai — isliye download me awaaz bhi aati hai. Proxy fail ho to phone ki TTS chalti hai (par woh recording me nahi jaati).
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const KSTORE="seetal-keys-v1";
+const GROQ={base:"https://api.groq.com/openai/v1", model:"qwen/qwen3.8-27b"};
+const stage=document.getElementById("stage"), ctx=stage.getContext("2d");
+const msg1=document.getElementById("msg1"), msg2=document.getElementById("msg2");
+const W=stage.width, H=stage.height;
+const st3d=document.getElementById("st3d"), stchar=document.getElementById("stchar"), stvoice=document.getElementById("stvoice");
+
+let renderer, scene, camera, sun;
+let world=[], people=[], shots=[], running=false;
+let recorder=null, chunks=[], blobUrl=null, actx=null, audioDest=null, currentAudio=null;
+let voiceOK=null;   // null = pata nahi, true/false = check hua
+
+function show(el,cls,txt){ el.className="msg show "+cls; el.textContent=txt; }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function key(){ try{ const s=JSON.parse(localStorage.getItem(KSTORE)||"{}"); return (s.keys&&(s.keys.groq||s.keys.openrouter))||""; }catch(e){ return ""; } }
+function parseJSON(t){
+  t=String(t||"").trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+  const a=t.indexOf("{"), b=t.lastIndexOf("}");
+  if(a>=0&&b>a) t=t.slice(a,b+1);
+  return JSON.parse(t);
+}
+
+/* ---------- 3D setup ---------- */
+function init3D(){
+  if(renderer) return true;
+  if(typeof THREE==="undefined"){ st3d.textContent="three.js load nahi hua"; st3d.style.color="var(--red)"; return false; }
+  try{
+    renderer=new THREE.WebGLRenderer({canvas:document.getElementById("gl"),antialias:true,preserveDrawingBuffer:true});
+  }catch(e){ st3d.textContent="WebGL band"; st3d.style.color="var(--red)"; return false; }
+  renderer.setSize(W,H,false); renderer.setPixelRatio(1);
+  renderer.shadowMap.enabled=true;
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(46,W/H,0.1,300);
+  camera.position.set(0,3.2,9.5); camera.lookAt(0,1.3,0);
+  scene.add(new THREE.HemisphereLight(0xffffff,0x33404d,0.9));
+  sun=new THREE.DirectionalLight(0xffffff,1.0); sun.position.set(5,11,7);
+  sun.castShadow=true; sun.shadow.mapSize.width=1024; sun.shadow.mapSize.height=1024;
+  sun.shadow.camera.left=-12; sun.shadow.camera.right=12; sun.shadow.camera.top=12; sun.shadow.camera.bottom=-12;
+  scene.add(sun);
+  st3d.textContent="chalu"; st3d.style.color="var(--green)";
+  return true;
+}
+
+function clearWorld(){
+  people.forEach(p=>scene.remove(p.root)); people=[];
+  world.forEach(o=>scene.remove(o)); world=[];
+}
+function add(o){ scene.add(o); world.push(o); return o; }
+
+function ground(color){
+  const g=new THREE.Mesh(new THREE.PlaneGeometry(300,300), new THREE.MeshLambertMaterial({color}));
+  g.rotation.x=-Math.PI/2; g.receiveShadow=true; add(g);
+}
+function tree(x,z,h){
+  const t=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.2,h*0.5,6), new THREE.MeshLambertMaterial({color:0x6b4a2f}));
+  t.position.set(x,h*0.25,z); t.castShadow=true; add(t);
+  const c=new THREE.Mesh(new THREE.ConeGeometry(h*0.45,h*1.0,7), new THREE.MeshLambertMaterial({color:0x2e7d32}));
+  c.position.set(x,h*0.5+h*0.45,z); c.castShadow=true; add(c);
+}
+function rock(x,z,s){
+  const r=new THREE.Mesh(new THREE.DodecahedronGeometry(s,0), new THREE.MeshLambertMaterial({color:0x555b66}));
+  r.position.set(x,s*0.5,z); r.castShadow=true; add(r);
+}
+function caveArch(){
+  const m=new THREE.MeshLambertMaterial({color:0x2b2b36});
+  [[-2.3,2.6],[2.3,2.6]].forEach(p=>{ const b=new THREE.Mesh(new THREE.BoxGeometry(1.7,5.2,2.2),m);
+    b.position.set(p[0],p[1],-2.4); b.castShadow=true; add(b); });
+  const top=new THREE.Mesh(new THREE.BoxGeometry(6.3,1.7,2.2),m); top.position.set(0,5.6,-2.4); top.castShadow=true; add(top);
+  const gl=new THREE.PointLight(0xffcc77,1.2,14); gl.position.set(0,1.7,-1.6); add(gl);
+}
+
+function buildScene(kind){
+  clearWorld();
+  if(kind==="cave"){
+    scene.background=new THREE.Color(0x161822); scene.fog=new THREE.Fog(0x161822,10,36); sun.intensity=0.5;
+    ground(0x3c3c47); caveArch(); rock(-4.2,1,1.2); rock(4.6,-1,1.4);
+  }else if(kind==="night"){
+    scene.background=new THREE.Color(0x0b1030); scene.fog=new THREE.Fog(0x0b1030,12,44); sun.intensity=0.4;
+    ground(0x22304a);
+    for(let i=0;i<7;i++) tree(-9+i*3.2,-7,2.6);
+    const stars=new THREE.Group();
+    for(let i=0;i<40;i++){ const s=new THREE.Mesh(new THREE.SphereGeometry(0.06,6,6), new THREE.MeshBasicMaterial({color:0xffffff}));
+      s.position.set((i*37%40)-20, 8+(i*13%12), -18-(i%7)); stars.add(s); }
+    add(stars);
+  }else if(kind==="river"){
+    scene.background=new THREE.Color(0x9fd8ef); scene.fog=new THREE.Fog(0x9fd8ef,22,70); sun.intensity=1.0;
+    ground(0x2f7d32);
+    const water=new THREE.Mesh(new THREE.PlaneGeometry(40,9), new THREE.MeshLambertMaterial({color:0x1f7a8c}));
+    water.rotation.x=-Math.PI/2; water.position.set(0,0.02,-3); add(water);
+    for(let i=0;i<6;i++) tree(-9+i*3.4,-7.5,2.6);
+  }else{
+    scene.background=new THREE.Color(0x9ed8f0); scene.fog=new THREE.Fog(0x9ed8f0,20,66); sun.intensity=1.0;
+    ground(0x2f7d32);
+    for(let i=0;i<8;i++) tree(-11+i*3.1,-6-Math.random()*5,2.6+Math.random()*1.4);
+    for(let i=0;i<4;i++) rock(-6+i*4,2+Math.random()*3,0.5+Math.random()*0.5);
+  }
+}
+
+/* ---------- cartoon character (code se) ---------- */
+function toonMat(color){ return new THREE.MeshLambertMaterial({color}); }
+
+function makeCharacter(opt){
+  const o=Object.assign({skin:0xf2c9a0, shirt:0x3366cc, pant:0x2b2b3a, hair:0x1b1b22, scale:1, girl:false}, opt||{});
+  const root=new THREE.Group();
+  const body=new THREE.Group(); root.add(body);
+
+  const torso=new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.30,0.72,12), toonMat(o.shirt));
+  torso.position.y=0.92; torso.castShadow=true; body.add(torso);
+
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.30,20,16), toonMat(o.skin));
+  head.position.y=1.55; head.castShadow=true; body.add(head);
+
+  const hair=new THREE.Mesh(new THREE.SphereGeometry(0.31,18,14,0,Math.PI*2,0,Math.PI*0.55), toonMat(o.hair));
+  hair.position.y=1.58; body.add(hair);
+
+  const eyeW=new THREE.Mesh(new THREE.SphereGeometry(0.055,10,10), toonMat(0xffffff));
+  const eyeW2=eyeW.clone(); eyeW.position.set(-0.11,1.58,0.26); eyeW2.position.set(0.11,1.58,0.26);
+  body.add(eyeW); body.add(eyeW2);
+  const pup=new THREE.Mesh(new THREE.SphereGeometry(0.028,8,8), toonMat(0x111111));
+  const pup2=pup.clone(); pup.position.set(-0.11,1.58,0.30); pup2.position.set(0.11,1.58,0.30);
+  body.add(pup); body.add(pup2);
+
+  const mouth=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.03,0.02), toonMat(0x7a2f2f));
+  mouth.position.set(0,1.44,0.29); body.add(mouth);
+
+  function limb(x,y,len,color){
+    const pivot=new THREE.Group(); pivot.position.set(x,y,0);
+    const m=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.06,len,8), toonMat(color));
+    m.position.y=-len/2; m.castShadow=true; pivot.add(m); body.add(pivot); return pivot;
+  }
+  const armL=limb(-0.33,1.2,0.55,o.shirt), armR=limb(0.33,1.2,0.55,o.shirt);
+  const legL=limb(-0.14,0.58,0.56,o.pant), legR=limb(0.14,0.58,0.56,o.pant);
+
+  if(o.girl){ // chhoti skirt + lamba baal
+    const skirt=new THREE.Mesh(new THREE.ConeGeometry(0.34,0.42,14), toonMat(0xcc4477));
+    skirt.position.y=0.62; body.add(skirt);
+    const plait=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.05,0.6,8), toonMat(o.hair));
+    plait.position.set(0.22,1.25,-0.16); body.add(plait);
+  }
+
+  root.scale.setScalar(o.scale);
+  root.userData={armL,armR,legL,legR,mouth,head,body,hair};
+  return root;
+}
+
+const KINDS={
+  boy:  {skin:0xf2c9a0, shirt:0x3366cc, pant:0x2b2b3a, hair:0x1b1b22, scale:1.0},
+  girl: {skin:0xf7d3b0, shirt:0xdd5588, pant:0x3a2b3a, hair:0x2a1a12, scale:0.95, girl:true},
+  man:  {skin:0xe0b48a, shirt:0x557755, pant:0x2b2b3a, hair:0x141414, scale:1.12},
+  robot:{skin:0x9aa7b4, shirt:0x6f7b8a, pant:0x4b5563, hair:0x333a44, scale:1.05}
+};
+
+function spawn(kind, x, faceLeft){
+  const spec=KINDS[kind]||KINDS.boy;
+  const root=makeCharacter(spec);
+  root.position.set(x,0,0);
+  root.rotation.y=faceLeft?-Math.PI/2.2:Math.PI/2.2;
+  scene.add(root);
+  const p={root, x0:x, kind, phase:Math.random()*3};
+  people.push(p);
+  stchar.textContent=people.length+" character";
+  stchar.style.color="var(--green)";
+  return p;
+}
+
+function animatePerson(p, t, speaking){
+  const u=p.root.userData;
+  const swing=Math.sin(t*Math.PI*8+p.phase)*0.5;
+  u.armL.rotation.x=swing;  u.armR.rotation.x=-swing;
+  u.legL.rotation.x=-swing*0.9; u.legR.rotation.x=swing*0.9;
+  p.root.position.y=Math.abs(Math.sin(t*Math.PI*8+p.phase))*0.05;
+  // blink
+  const blink=(Math.sin(t*Math.PI*2+p.phase)>0.985)?0.1:1;
+  u.head.scale.y=blink;
+  // mooh
+  u.mouth.scale.y = speaking ? (1.2+Math.abs(Math.sin(t*22))*2.4) : 1;
+}
+
+/* ---------- audio (TTS mp3 + Web Audio) ---------- */
+function audioCtx(){
+  if(!actx){ actx=new (window.AudioContext||window.webkitAudioContext)(); audioDest=actx.createMediaStreamDestination(); }
+  return actx;
+}
+function ttsURL(text){
+  return "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=hi&q="+encodeURIComponent(text);
+}
+async function fetchVoice(text){
+  const direct=ttsURL(text);
+  const proxies=[
+    "https://api.allorigins.win/raw?url="+encodeURIComponent(direct),
+    "https://corsproxy.io/?"+encodeURIComponent(direct)
+  ];
+  for(const u of proxies){
+    try{
+      const r=await fetch(u); if(!r.ok) continue;
+      const buf=await r.arrayBuffer();
+      if(buf.byteLength<2000) continue;
+      const ac=audioCtx();
+      const audio=await ac.decodeAudioData(buf);
+      return audio;
+    }catch(e){}
+  }
+  return null;
+}
+function playBuffer(audio){
+  const ac=audioCtx();
+  if(currentAudio){ try{currentAudio.stop();}catch(e){} }
+  const src=ac.createBufferSource(); src.buffer=audio;
+  src.connect(ac.destination);
+  if(audioDest) src.connect(audioDest);
+  src.start();
+  currentAudio=src;
+  return src;
+}
+
+/* ---------- overlay ---------- */
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath(); }
+function wrap(text,maxW,c){ const words=String(text||"").split(/\s+/); const out=[]; let cur="";
+  words.forEach(w=>{ const t=cur?cur+" "+w:w; if(c.measureText(t).width>maxW&&cur){out.push(cur);cur=w;} else cur=t; }); if(cur) out.push(cur); return out; }
+
+function overlay(s, fade){
+  ctx.fillStyle="rgba(0,0,0,.5)"; ctx.fillRect(0,0,W,H*0.05); ctx.fillRect(0,H-H*0.05,W,H*0.05);
+  let subH=0;
+  if(s.text){
+    ctx.font="800 36px Manrope, sans-serif"; ctx.textAlign="center";
+    const lines=wrap(s.text,W-90,ctx); const lh=44; subH=lines.length*lh+28;
+    ctx.fillStyle="rgba(0,0,0,.62)"; roundRect(34,H-subH-34,W-68,subH,12); ctx.fill();
+    ctx.fillStyle="#fff"; let y=H-subH-34+38;
+    lines.forEach(l=>{ ctx.fillText(l,W/2,y); y+=lh; });
+  }
+  if(s.say){
+    ctx.font="700 28px Manrope, sans-serif"; ctx.textAlign="left";
+    const lines=wrap(s.say,W-120,ctx); const h=lines.length*34+54;
+    const y=H-h-(subH+58);
+    ctx.fillStyle="rgba(8,12,18,.8)"; roundRect(28,y,W-56,h,16); ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,.16)"; ctx.lineWidth=2; roundRect(28,y,W-56,h,16); ctx.stroke();
+    if(s.speaker){ ctx.fillStyle="#3fb950"; ctx.font="800 20px Manrope, sans-serif"; ctx.fillText(String(s.speaker).toUpperCase(),50,y+30); }
+    ctx.fillStyle="#fff"; ctx.font="600 28px Manrope, sans-serif";
+    let yy=y+(s.speaker?64:38); lines.forEach(l=>{ ctx.fillText(l,50,yy); yy+=34; });
+  }
+  if(fade>0){ ctx.fillStyle="rgba(0,0,0,"+fade+")"; ctx.fillRect(0,0,W,H); }
+}
+
+function moveCamera(cam, t){
+  const look=new THREE.Vector3(0,1.3,0);
+  if(cam===0){ camera.position.set(0.5*t-0.25, 3.0-0.4*t, 9.5-2.2*t); }
+  else if(cam===1){ camera.position.set(-3.5+7*t, 2.1, 6.2); }
+  else if(cam===2){ camera.position.set(0, 5.2-0.7*t, 11-1.2*t); look.set(0,1.0,0); }
+  else { camera.position.set(3-1.1*t, 2.5, 7.0); }
+  camera.lookAt(look);
+}
+
+function renderFrame(shot, t, speaking){
+  people.forEach((p,i)=>{
+    const spread = people.length>1 ? (i===0?-0.9:0.9) : 0;
+    p.root.position.x = p.x0 + spread + (t-0.5)*2.4*(i===0?1:-1);
+    animatePerson(p,t,speaking);
+  });
+  moveCamera(shot.cam||0, t);
+  renderer.render(scene,camera);
+  ctx.fillStyle="#000"; ctx.fillRect(0,0,W,H);
+  try{ ctx.drawImage(renderer.domElement,0,0,W,H); }catch(e){}
+  let fade=0;
+  if(t<0.1) fade=(1-t/0.1)*0.85;
+  if(t>0.92) fade=((t-0.92)/0.08)*0.85;
+  overlay(shot, fade);
+}
+
+/* ---------- story ---------- */
+async function askGroq(prompt){
+  const k=key();
+  if(!k) throw new Error("Groq key nahi mili — Simple Agent page par key save karo.");
+  const r=await fetch(GROQ.base+"/chat/completions",{
+    method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+k},
+    body:JSON.stringify({model:GROQ.model,temperature:0.85,max_tokens:1200,
+      messages:[{role:"system",content:"Tum 3D cartoon film ke director ho. Sirf JSON do."},{role:"user",content:prompt}]})});
+  if(!r.ok) throw new Error("Groq HTTP "+r.status+" — "+(await r.text()).slice(0,110));
+  const j=await r.json();
+  return (j.choices&&j.choices[0]&&j.choices[0].message.content)||"";
+}
+
+document.getElementById("make").onclick=async ()=>{
+  const story=document.getElementById("topic").value.trim();
+  if(!story){ show(msg1,"bad","Pehle kahani likho."); return; }
+  if(!init3D()){ show(msg1,"bad","3D chalu nahi hua — page refresh karo ya browser update karo."); return; }
+  const n=document.getElementById("nshots").value;
+  show(msg1,"info","Director plan bana raha hai…");
+  try{
+    const raw=await askGroq(`Kahani: "${story}"
+Ise ${n} shots me todo (3D cartoon).
+Har shot: {"text":"subtitle 6-8 shabd Hinglish","say":"dialogue ek line","speaker":"Boy|Girl|Narrator",
+"scene":"jungle|cave|night|river","hero":"boy|girl|man|robot","partner":"girl|boy|(khaali)","cam":0}
+cam: 0=dolly in, 1=side, 2=high wide, 3=angle.
+Sirf JSON: {"title":"...","shots":[...]}`);
+    const d=parseJSON(raw);
+    shots=(d.shots||[]).map(s=>({
+      text:s.text||"", say:s.say||"", speaker:s.speaker||"",
+      scene:/cave|night|river/.test(String(s.scene||""))?s.scene:"jungle",
+      hero:KINDS[String(s.hero||"").toLowerCase()]?String(s.hero).toLowerCase():"boy",
+      partner:(String(s.partner||"").trim() && KINDS[String(s.partner).toLowerCase()])?String(s.partner).toLowerCase():"",
+      cam:Math.max(0,Math.min(3,parseInt(s.cam||0,10)))
+    }));
+    if(!shots.length) throw new Error("plan khaali aaya");
+    document.getElementById("shots").innerHTML=shots.map((s,i)=>
+      `<div><b>${i+1}.</b> ${esc(s.text)} <span style="opacity:.6">· ${esc(s.scene)} · ${esc(s.hero)}${s.partner?" + "+esc(s.partner):""}</span></div>`).join("");
+
+    buildScene(shots[0].scene);
+    spawn(shots[0].hero,-1.4,false);
+    if(shots[0].partner) spawn(shots[0].partner,1.4,true);
+    renderFrame(shots[0],0.5,false);
+
+    show(msg1,"info","Awaaz ka rasta check kar raha hoon…");
+    const test=await fetchVoice("नमस्ते");
+    voiceOK=!!test;
+    stvoice.textContent = voiceOK ? "TTS chalu (recording me aayegi)" : "sirf phone TTS (recording me nahi)";
+    stvoice.style.color = voiceOK ? "var(--green)" : "var(--amber)";
+    show(msg1,"ok",shots.length+" shots taiyar. Awaaz: "+(voiceOK?"TTS mp3 — record me aayegi":"phone TTS — record me nahi aayegi"));
+  }catch(e){ show(msg1,"bad","Ruk gaya: "+e.message); }
+};
+
+/* ---------- playback ---------- */
+async function playFilm(record){
+  if(!shots.length){ show(msg2,"bad","Pehle step 1 dabao."); return; }
+  if(running) return; running=true;
+  const per=parseInt(document.getElementById("secs").value,10);
+
+  let stream=stage.captureStream(30);
+  if(record){
+    audioCtx();
+    try{ await actx.resume(); }catch(e){}
+    const tracks=[...stream.getVideoTracks()];
+    if(voiceOK && audioDest) tracks.push(...audioDest.stream.getAudioTracks());
+    const mixed=new MediaStream(tracks);
+    const mime=MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")?"video/webm;codecs=vp9,opus":"video/webm";
+    chunks=[]; recorder=new MediaRecorder(mixed,{mimeType:mime,videoBitsPerSecond:5000000});
+    recorder.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
+    recorder.onstop=()=>{
+      const blob=new Blob(chunks,{type:"video/webm"});
+      if(blobUrl) URL.revokeObjectURL(blobUrl);
+      blobUrl=URL.createObjectURL(blob);
+      const a=document.createElement("a"); a.href=blobUrl; a.download="seetal-3d-"+Date.now()+".webm";
+      document.body.appendChild(a); a.click(); a.remove();
+      show(msg2,"ok","Video ban gayi — "+(blob.size/1048576).toFixed(2)+" MB (awaaz: "+(voiceOK?"haan":"nahi")+")");
+    };
+    recorder.start(400);
+    show(msg2,"info","Record ho raha hai…");
+  }else show(msg2,"info","Film chal rahi hai…");
+
+  for(let i=0;i<shots.length;i++){
+    const s=shots[i];
+    buildScene(s.scene);
+    spawn(s.hero,-1.4,false);
+    if(s.partner) spawn(s.partner,1.4,true);
+
+    let speaking=false;
+    if(s.say){
+      speaking=true;
+      if(voiceOK){
+        const audio=await fetchVoice(s.say);
+        if(audio) playBuffer(audio);
+        else if(window.speechSynthesis){ const u=new SpeechSynthesisUtterance(s.say); u.lang="hi-IN"; speechSynthesis.speak(u); }
+      }else if(window.speechSynthesis){
+        const u=new SpeechSynthesisUtterance(s.say); u.lang="hi-IN"; u.rate=0.92; speechSynthesis.speak(u);
+      }
+    }
+    await new Promise(res=>{
+      const t0=performance.now();
+      (function loop(){
+        const t=Math.min(1,(performance.now()-t0)/per);
+        renderFrame(s,t,speaking);
+        if(t<1) requestAnimationFrame(loop); else res();
+      })();
+    });
+    speaking=false;
+  }
+  if(record && recorder && recorder.state!=="inactive") recorder.stop();
+  running=false;
+  if(!record) show(msg2,"ok","Film poori chali — ab record dabao.");
+}
+
+document.getElementById("play").onclick=()=>playFilm(false);
+document.getElementById("rec").onclick=()=>playFilm(true);
+if(init3D()){ buildScene("jungle"); spawn("boy",-1.4,false); renderFrame({text:"",say:"",cam:0},0.5,false); }
+</script>
+</body>
+</html>
