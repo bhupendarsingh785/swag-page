@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Seetal 3D Cartoon Studio v5</title>
+<meta name="description" content="Seetal 3D Cartoon Studio V5 Hybrid: AI story planning, editable scenes, imported GLB characters and phone-side video rendering.">
+<title>Seetal 3D Cartoon Studio V6 — Hybrid Edition</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -42,15 +43,15 @@ canvas{width:100%;height:100%;display:block}
 </head>
 <body>
 <div class="wrap">
-  <h1>Seetal 3D Cartoon <span style="font-size:12px;color:var(--dim);font-family:'Azeret Mono',monospace">v5</span></h1>
-  <div class="sub">Character code se bante hain (toon look + outline). Awaaz + music + effects, sab record me aate hain.</div>
+  <h1>Seetal 3D Cartoon Studio <span style="font-size:12px;color:var(--green);font-family:'Azeret Mono',monospace">V5 HYBRID</span></h1>
+  <div class="sub">AI director + editable 3D scenes + imported cartoon models + Hindi voice + phone rendering.</div>
 
   <div class="card">
     <label>Kahani</label>
     <textarea id="topic">Ek ladka jungle se darta hai. Aage jaakar use ek gufa milti hai. Wahan ek ladki milti hai. Woh usse bachata hai aur dosti ho jaati hai.</textarea>
     <div class="row">
       <div style="flex:1;min-width:100px"><label>Shots</label>
-        <select id="nshots"><option>3</option><option selected>4</option><option>5</option></select></div>
+        <select id="nshots"><option>3</option><option selected>4</option><option>5</option><option>8</option><option>10</option><option>12</option></select></div>
       <div style="flex:1;min-width:100px"><label>Kam se kam har shot</label>
         <select id="secs"><option value="4000">4 sec</option><option value="5000" selected>5 sec</option><option value="6000">6 sec</option></select></div>
     </div>
@@ -60,23 +61,62 @@ canvas{width:100%;height:100%;display:block}
     <div class="shots" id="shots"></div>
   </div>
 
+
+  <div class="card v5-card">
+    <div class="v5-heading"><span>V5 CHARACTER WORKSHOP</span><span class="v5-chip">HYBRID</span></div>
+    <p class="v5-help">TV-cartoon quality ke liye apna rigged 3D character (.glb / .gltf) import karein. Model aapke phone/browser mein load hota hai; model file kisi server par upload nahi hoti.</p>
+    <div class="v5-grid">
+      <div>
+        <label>3D Cartoon Character Model</label>
+        <input id="modelFile" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json">
+      </div>
+      <div>
+        <label>Character source</label>
+        <select id="characterSource">
+          <option value="procedural">Built-in cartoon character</option>
+          <option value="imported">Imported 3D model</option>
+        </select>
+      </div>
+    </div>
+    <div class="v5-row">
+      <button id="clearModel" type="button">Remove imported model</button>
+      <span id="modelStatus" class="v5-status">Built-in character active</span>
+    </div>
+    <p class="v5-note">Best result: rigged humanoid GLB with walk / idle / run animation clips. Static GLB bhi import hoga, lekin usmein built-in walk cycle nahi hogi.</p>
+  </div>
+
+  <div class="card v5-card">
+    <div class="v5-heading"><span>SCENE TIMELINE & PROJECT</span><span class="v5-chip">EDITABLE</span></div>
+    <div class="v5-row">
+      <button id="addShot" type="button">＋ Add scene</button>
+      <button id="saveProject" type="button">Save project JSON</button>
+      <button id="loadProjectBtn" type="button">Load project JSON</button>
+      <input id="loadProjectFile" type="file" accept=".json,application/json" hidden>
+    </div>
+    <div id="timeline" class="v5-timeline"><div class="v5-note">Pehle AI plan ya Demo plan banayein. Phir yahan har scene edit kar sakte hain.</div></div>
+    <div class="v5-note">Har scene ka dialogue, subtitle, location, character action aur camera edit kiya ja sakta hai. Long film ke liye scenes ko parts mein save karke alag-alag render karein.</div>
+  </div>
+
   <div class="card">
     <div class="stage"><canvas id="stage" width="720" height="1280"></canvas><canvas id="gl" width="720" height="1280"></canvas></div>
     <div class="status"><span>3D: <b id="st3d">—</b></span><span>Character: <b id="stchar">—</b></span><span>Awaaz: <b id="stvoice">—</b></span><span>AI: <b id="stai">—</b></span></div>
     <div class="row">
       <button id="play">2. Film chalao</button>
       <button id="rec">3. Record + download</button>
+      <button id="stopbtn" style="display:none">Roko</button>
     </div>
     <div class="msg" id="msg2"></div>
     <div id="dl"></div>
   </div>
 
   <div class="foot">
-    Awaaz: har dialogue ki Hindi mp3 free TTS se aati hai (proxy ke raste). Record shuru hone se PEHLE saari awaazein download ho jaati hain, taaki video me beech me ruka hua frame na aaye. Music aur effects Web Audio se bante hain. Proxy fail ho to phone ki TTS chalti hai (woh recording me nahi jaati).
+    Hybrid mode: 3D rendering phone/browser par hoti hai. AI scene planning internet aur saved API key par depend karti hai. Awaaz: har dialogue ki Hindi mp3 free TTS se aati hai (proxy ke raste). Record shuru hone se PEHLE saari awaazein download ho jaati hain, taaki video me beech me ruka hua frame na aaye. Music aur effects Web Audio se bante hain. Proxy fail ho to phone ki TTS chalti hai (woh recording me nahi jaati).
   </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
 <script>
 const KSTORE="seetal-keys-v1";
 const GROQ={base:"https://api.groq.com/openai/v1", model:"qwen/qwen3.8-27b"};
@@ -155,30 +195,6 @@ function caveArch(){
   const gl=new THREE.PointLight(0xffcc77,1.3,14); gl.position.set(0,1.8,-0.8); add(gl);
 }
 
-function skyTex(top,bottom){
-  const c=document.createElement("canvas"); c.width=8; c.height=256;
-  const x=c.getContext("2d"); const g=x.createLinearGradient(0,0,0,256);
-  g.addColorStop(0,top); g.addColorStop(1,bottom);
-  x.fillStyle=g; x.fillRect(0,0,8,256);
-  const t=new THREE.CanvasTexture(c); t.minFilter=THREE.LinearFilter; return t;
-}
-function sunOrb(color,y,z){
-  const m=new THREE.Mesh(new THREE.SphereGeometry(1.1,20,16), new THREE.MeshBasicMaterial({color}));
-  m.position.set(3.6,y,z); add(m); return m;
-}
-function clouds(n,color){
-  for(let i=0;i<n;i++){
-    const g=new THREE.Group();
-    for(let k=0;k<3;k++){
-      const b=new THREE.Mesh(new THREE.SphereGeometry(0.5+Math.random()*0.4,10,8),
-        new THREE.MeshLambertMaterial({color, transparent:true, opacity:0.9}));
-      b.position.set(k*0.7-0.7, Math.random()*0.2, Math.random()*0.3); g.add(b);
-    }
-    g.position.set(-9+i*4.5, 6.5+Math.random()*2, -12-Math.random()*6);
-    add(g);
-  }
-}
-
 function buildScene(kind){
   clearWorld();
   if(kind==="cave"){
@@ -194,14 +210,14 @@ function buildScene(kind){
       s.position.set((i*37%40)-20, 8+(i*13%12), -18-(i%7)); stars.add(s); }
     add(stars);
   }else if(kind==="river"){
-    scene.background=skyTex("#bfe9ff","#eaf7ff"); scene.fog=new THREE.Fog(0xbfe9ff,22,70); sun.intensity=1.0; sunOrb(0xfff3b0,7,-16); clouds(3,0xffffff);
+    scene.background=new THREE.Color(0x9fd8ef); scene.fog=new THREE.Fog(0x9fd8ef,22,70); sun.intensity=1.0;
     ground(0x3a9a3e);
     const water=new THREE.Mesh(new THREE.PlaneGeometry(40,9), new THREE.MeshLambertMaterial({color:0x2a9db5}));
     water.rotation.x=-Math.PI/2; water.position.set(0,0.02,-5); add(water);
     for(let i=0;i<6;i++) tree(-9+i*3.4,-10,2.6);
     orb(5,10,-30,2.2,0xffe27a);
   }else{
-    scene.background=skyTex("#8fd3f4","#e8f7c8"); scene.fog=new THREE.Fog(0xbfe6f0,20,66); sun.intensity=1.0; sunOrb(0xfff0a8,7,-16); clouds(4,0xffffff);
+    scene.background=new THREE.Color(0x9ed8f0); scene.fog=new THREE.Fog(0x9ed8f0,20,66); sun.intensity=1.0;
     ground(0x3a9a3e);
     for(let i=0;i<8;i++) tree(-11+i*3.1,-6-((i*7)%5),2.6+((i*3)%4)*0.35);
     for(let i=0;i<4;i++) rock(-6+i*4,2+((i*5)%3),0.5+((i*3)%3)*0.2);
@@ -214,92 +230,45 @@ function toonMat(color){ return new THREE.MeshToonMaterial({color}); }
 const OUTLINE=()=>new THREE.MeshBasicMaterial({color:0x14141c,side:THREE.BackSide});
 function outlined(mesh,k){ const o=new THREE.Mesh(mesh.geometry,OUTLINE()); o.scale.setScalar(k||1.09); mesh.add(o); return mesh; }
 
-function toonGrad(){
-  if(toonGrad.tex) return toonGrad.tex;
-  const c=document.createElement("canvas"); c.width=4; c.height=1;
-  const x=c.getContext("2d");
-  const steps=["#5a5a5a","#8f8f8f","#c4c4c4","#ffffff"];
-  steps.forEach((col,i)=>{ x.fillStyle=col; x.fillRect(i,0,1,1); });
-  const t=new THREE.CanvasTexture(c);
-  t.minFilter=THREE.NearestFilter; t.magFilter=THREE.NearestFilter;
-  toonGrad.tex=t; return t;
-}
-function toonMat(color){ return new THREE.MeshToonMaterial({color, gradientMap:toonGrad()}); }
-
 function makeCharacter(opt){
   const o=Object.assign({skin:0xf2c9a0, shirt:0x3366cc, pant:0x2b2b3a, hair:0x1b1b22, scale:1, girl:false}, opt||{});
   const root=new THREE.Group();
   const body=new THREE.Group(); root.add(body);
 
-  // pair (joote)
-  [-0.14,0.14].forEach(x=>{
-    const foot=new THREE.Mesh(new THREE.BoxGeometry(0.17,0.10,0.28), toonMat(0x22242b));
-    foot.position.set(x,0.05,0.06); foot.castShadow=true; body.add(foot);
-  });
+  const torso=outlined(new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.30,0.72,12), toonMat(o.shirt)));
+  torso.position.y=0.92; torso.castShadow=true; body.add(torso);
 
-  // dhad
-  const torso=outlined(new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.29,0.66,14), toonMat(o.shirt)),1.07);
-  torso.position.y=0.90; torso.castShadow=true; body.add(torso);
+  const head=outlined(new THREE.Mesh(new THREE.SphereGeometry(0.30,20,16), toonMat(o.skin)),1.07);
+  head.position.y=1.55; head.castShadow=true; body.add(head);
 
-  // gardan
-  const neck=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.10,0.12,10), toonMat(o.skin));
-  neck.position.y=1.26; body.add(neck);
+  const hair=new THREE.Mesh(new THREE.SphereGeometry(0.315,18,14,0,Math.PI*2,0,Math.PI*0.55), toonMat(o.hair));
+  hair.position.y=1.58; body.add(hair);
 
-  // bada sir (cartoon proportion)
-  const head=new THREE.Mesh(new THREE.SphereGeometry(0.34,22,18), toonMat(o.skin));
-  head.position.y=1.62; head.castShadow=true; body.add(head);
-  outlined(head,1.05);
-
-  // baal
-  const hair=new THREE.Mesh(new THREE.SphereGeometry(0.355,20,16,0,Math.PI*2,0,Math.PI*0.58), toonMat(o.hair));
-  hair.position.y=1.64; body.add(hair);
-  if(o.girl){
-    const plait=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.05,0.66,8), toonMat(o.hair));
-    plait.position.set(0.24,1.28,-0.14); body.add(plait);
-  }
-
-  // aankhein: safed + kaali putli + chamak
+  // aankhein: bade cartoon eyes. blink = sirf aankh ka y-scale (sir nahi)
   const eyes=[];
-  [-0.125,0.125].forEach(x=>{
-    const eg=new THREE.Group(); eg.position.set(x,1.64,0.285);
-    const w=new THREE.Mesh(new THREE.SphereGeometry(0.082,14,12), new THREE.MeshBasicMaterial({color:0xffffff})); eg.add(w);
-    const pu=new THREE.Mesh(new THREE.SphereGeometry(0.042,12,10), new THREE.MeshBasicMaterial({color:0x14161c}));
-    pu.position.set(0,0,0.062); eg.add(pu);
-    const gl=new THREE.Mesh(new THREE.SphereGeometry(0.016,8,8), new THREE.MeshBasicMaterial({color:0xffffff}));
-    gl.position.set(0.018,0.022,0.095); eg.add(gl);
+  [-0.115,0.115].forEach(x=>{
+    const eg=new THREE.Group(); eg.position.set(x,1.57,0.255);
+    const w=new THREE.Mesh(new THREE.SphereGeometry(0.068,12,10), toonMat(0xffffff)); eg.add(w);
+    const p=new THREE.Mesh(new THREE.SphereGeometry(0.034,10,8), new THREE.MeshBasicMaterial({color:0x111111})); p.position.set(0,0,0.054); eg.add(p);
     body.add(eg); eyes.push(eg);
   });
 
-  // bhaunh
-  [-0.125,0.125].forEach((x,i)=>{
-    const b=new THREE.Mesh(new THREE.BoxGeometry(0.10,0.018,0.02), new THREE.MeshBasicMaterial({color:o.hair}));
-    b.position.set(x,1.75,0.29); b.rotation.z=i?-0.12:0.12; body.add(b);
-  });
+  const mouth=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.03,0.02), toonMat(0x8a2f2f));
+  mouth.position.set(0,1.43,0.29); body.add(mouth);
 
-  // mooh
-  const mouth=new THREE.Mesh(new THREE.BoxGeometry(0.13,0.028,0.02), new THREE.MeshBasicMaterial({color:0x8a2f2f}));
-  mouth.position.set(0,1.49,0.315); body.add(mouth);
-
-  // gaal
-  [-0.20,0.20].forEach(x=>{
-    const c=new THREE.Mesh(new THREE.CircleGeometry(0.05,10), new THREE.MeshBasicMaterial({color:0xf08b8b, transparent:true, opacity:0.55}));
-    c.position.set(x,1.54,0.30); body.add(c);
-  });
-
-  function limb(x,y,len,color,rad){
+  function limb(x,y,len,color){
     const pivot=new THREE.Group(); pivot.position.set(x,y,0);
-    const m=outlined(new THREE.Mesh(new THREE.CylinderGeometry(rad||0.075,rad?rad*0.9:0.065,len,10), toonMat(color)),1.1);
-    m.position.y=-len/2; m.castShadow=true; pivot.add(m);
-    const hand=new THREE.Mesh(new THREE.SphereGeometry(rad?rad*1.15:0.085,12,10), toonMat(color===o.pant?o.skin:o.skin));
-    hand.position.y=-len; pivot.add(hand);
-    body.add(pivot); return pivot;
+    const m=outlined(new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.06,len,8), toonMat(color)),1.12);
+    m.position.y=-len/2; m.castShadow=true; pivot.add(m); body.add(pivot); return pivot;
   }
-  const armL=limb(-0.30,1.16,0.52,o.shirt), armR=limb(0.30,1.16,0.52,o.shirt);
-  const legL=limb(-0.13,0.62,0.55,o.pant,0.085), legR=limb(0.13,0.62,0.55,o.pant,0.085);
+  const armL=limb(-0.33,1.2,0.55,o.shirt), armR=limb(0.33,1.2,0.55,o.shirt);
+  const legL=limb(-0.14,0.58,0.56,o.pant), legR=limb(0.14,0.58,0.56,o.pant);
 
   if(o.girl){
-    const skirt=outlined(new THREE.Mesh(new THREE.ConeGeometry(0.33,0.40,16), toonMat(0xcc4477)),1.05);
-    skirt.position.y=0.66; body.add(skirt);
+    const skirt=outlined(new THREE.Mesh(new THREE.ConeGeometry(0.34,0.42,14), toonMat(0xcc4477)),1.06);
+    skirt.position.y=0.62; body.add(skirt);
+    const plait=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.05,0.6,8), toonMat(o.hair));
+    plait.position.set(0.22,1.25,-0.16); body.add(plait);
   }
 
   root.scale.setScalar(o.scale);
@@ -313,7 +282,7 @@ const KINDS={
   man:  {skin:0xe0b48a, shirt:0x557755, pant:0x2b2b3a, hair:0x141414, scale:1.12},
   robot:{skin:0x9aa7b4, shirt:0x6f7b8a, pant:0x4b5563, hair:0x333a44, scale:1.05}
 };
-const ACTIONS=["walk","run","idle","scared","happy","wave"];
+const ACTIONS=["walk","run","idle","scared","happy","wave","jump","dance","point"];
 
 // portrait (9:16) frame me chhoti jagah hai, isliye character kam faasle par: akela x=0, do log x=±0.95
 function spawn(kind, x, faceLeft, action){
@@ -366,6 +335,21 @@ function animatePerson(p, t, sec, speaking){
     u.body.position.y=Math.sin(sec*2+ph)*0.012;
     u.armR.rotation.z=2.3+Math.sin(sec*9)*0.35;
     u.armL.rotation.z=-0.08;
+  }else if(a==="jump"){
+    u.body.position.y=Math.abs(Math.sin(sec*5+ph))*0.48;
+    u.armL.rotation.z=-1.7; u.armR.rotation.z=1.7;
+    u.legL.rotation.x=-0.25; u.legR.rotation.x=0.25;
+  }else if(a==="dance"){
+    u.body.position.y=Math.abs(Math.sin(sec*7+ph))*0.16;
+    u.body.rotation.y=Math.sin(sec*5+ph)*0.28;
+    u.armL.rotation.z=-1.4+Math.sin(sec*8+ph)*0.55;
+    u.armR.rotation.z=1.4-Math.sin(sec*8+ph)*0.55;
+    u.legL.rotation.x=Math.sin(sec*7+ph)*0.45;
+    u.legR.rotation.x=-Math.sin(sec*7+ph)*0.45;
+  }else if(a==="point"){
+    u.body.rotation.y=Math.sin(sec*1.5)*0.08;
+    u.armR.rotation.z=1.15; u.armR.rotation.x=-0.25;
+    u.armL.rotation.z=-0.12;
   }
 
   // aankh jhapakna (sirf aankhein)
@@ -516,7 +500,7 @@ function renderFrame(shot, t, speaking, sec){
     p.root.position.x = p.x0 + (moving?(t-0.5)*span*p.dir:0);
     const sp=String(shot.speaker||"");
     const who=/narrator/i.test(sp)?-1:(/girl/i.test(sp)&&people.length>1?1:0);   // kaun bol raha hai
-    animatePerson(p,t,sec,speaking&&i===who);
+    if(!p.external) animatePerson(p,t,sec,speaking&&i===who);
   });
   moveCamera(shot.cam||0, t);
   renderer.render(scene,camera);
@@ -529,7 +513,7 @@ function renderFrame(shot, t, speaking, sec){
 }
 
 /* ---------- story ---------- */
-/* ---------- AI providers: Groq, OpenAI, OpenRouter, Gemini ---------- */
+/* ---------- AI: Groq, OpenAI, OpenRouter, Gemini ---------- */
 const PROVIDERS=[
   {id:"groq",       name:"Groq",       kind:"openai", base:"https://api.groq.com/openai/v1", model:"qwen/qwen3.8-27b"},
   {id:"openai",     name:"OpenAI",     kind:"openai", base:"https://api.openai.com/v1", model:"gpt-4o-mini"},
@@ -539,7 +523,6 @@ const PROVIDERS=[
 function allKeys(){ try{ return (JSON.parse(localStorage.getItem(KSTORE)||"{}").keys)||{}; }catch(e){ return {}; } }
 function providerKey(id){ const k=allKeys(); return k[id]||""; }
 function usableProviders(){ return PROVIDERS.filter(p=>providerKey(p.id)); }
-
 let geminiModel="";
 async function geminiPick(key){
   if(geminiModel) return geminiModel;
@@ -555,7 +538,6 @@ async function geminiPick(key){
   if(!geminiModel) throw new Error("gemini model nahi mila");
   return geminiModel;
 }
-
 async function callOne(p, system, user){
   const key=providerKey(p.id);
   if(p.kind==="gemini"){
@@ -564,7 +546,7 @@ async function callOne(p, system, user){
       method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
       body:JSON.stringify({systemInstruction:{parts:[{text:system}]},
         contents:[{role:"user",parts:[{text:user}]}],
-        generationConfig:{temperature:0.85,maxOutputTokens:1400}})});
+        generationConfig:{temperature:0.85,maxOutputTokens:1500}})});
     if(!r.ok) throw new Error("HTTP "+r.status+" "+(await r.text()).slice(0,90));
     const j=await r.json(); const c=j.candidates&&j.candidates[0];
     const txt=(c&&c.content&&c.content.parts||[]).map(x=>x.text||"").join("");
@@ -573,7 +555,7 @@ async function callOne(p, system, user){
   }
   const r=await fetch(p.base+"/chat/completions",{
     method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
-    body:JSON.stringify({model:p.model,temperature:0.85,max_tokens:1400,
+    body:JSON.stringify({model:p.model,temperature:0.85,max_tokens:1500,
       messages:[{role:"system",content:system},{role:"user",content:user}]})});
   if(!r.ok) throw new Error("HTTP "+r.status+" "+(await r.text()).slice(0,90));
   const j=await r.json();
@@ -581,23 +563,53 @@ async function callOne(p, system, user){
   if(!String(txt).trim()) throw new Error("jawab khaali");
   return txt;
 }
-
-/* ek provider fail ho to agla — jo key jis order me save hai */
 async function askAI(system, user){
   const list=usableProviders();
-  if(!list.length) throw new Error("Koi AI key nahi mili — Simple Agent page par Groq/Gemini/OpenAI ki key save karo.");
+  if(!list.length) throw new Error("Koi AI key nahi mili — Simple Agent page par Groq/Gemini/OpenAI ki key save karo (ya Demo plan dabao).");
   let last=null;
   for(const p of list){
     try{
       const txt=await callOne(p, system, user);
-      stai.textContent=p.name+" ✓"; stai.style.color="var(--green)";
+      if(stai){ stai.textContent=p.name+" ✓"; stai.style.color="var(--green)"; }
       return txt;
     }catch(e){
       last=e;
-      stai.textContent=p.name+" fail"; stai.style.color="var(--red)";
+      if(stai){ stai.textContent=p.name+" fail"; stai.style.color="var(--red)"; }
     }
   }
   throw new Error("Saare AI fail — "+(last?last.message:"?"));
+}
+
+function normShots(arr){
+  const act=v=>ACTIONS.includes(String(v||"").toLowerCase())?String(v).toLowerCase():"";
+  return (arr||[]).map(s=>({
+    text:s.text||"", say:s.say||"", speaker:s.speaker||"",
+    scene:/cave|night|river/.test(String(s.scene||""))?s.scene:"jungle",
+    hero:KINDS[String(s.hero||"").toLowerCase()]?String(s.hero).toLowerCase():"boy",
+    partner:(String(s.partner||"").trim() && KINDS[String(s.partner).toLowerCase()])?String(s.partner).toLowerCase():"",
+    heroAct:act(s.hero_action)||"walk", partnerAct:act(s.partner_action)||"idle",
+    cam:Math.max(0,Math.min(3,parseInt(s.cam||0,10)||0))
+  }));
+}
+
+const DEMO=[
+ {text:"Ghummata ladka jungle se darta",say:"Yeh jungle bahut dark aur scary lagta hai.",speaker:"Boy",scene:"jungle",hero:"boy",partner:"",hero_action:"scared",cam:0},
+ {text:"Darr ke beech gufa ka ghar",say:"Aage ek andheri gufa dikhi mujhe.",speaker:"Narrator",scene:"cave",hero:"boy",partner:"",hero_action:"walk",cam:1},
+ {text:"Andhere mein akeli ladki mili",say:"Wahan ek buri haalat ki ladki thi.",speaker:"Narrator",scene:"cave",hero:"boy",partner:"girl",hero_action:"idle",partner_action:"scared",cam:3},
+ {text:"Ab hum dono dost hain",say:"Shukriya, ab main akele nahi hoon.",speaker:"Girl",scene:"river",hero:"boy",partner:"girl",hero_action:"happy",partner_action:"happy",cam:2}
+];
+
+function applyShots(list,msgText){
+  shots=normShots(list);
+  if(!shots.length) throw new Error("plan khaali aaya");
+  voiceCache.clear();
+  document.getElementById("shots").innerHTML=shots.map((s,i)=>
+    `<div><b>${i+1}.</b> ${esc(s.text)} <span style="opacity:.6">· ${esc(s.scene)} · ${esc(s.hero)}:${esc(s.heroAct)}${s.partner?" + "+esc(s.partner)+":"+esc(s.partnerAct):""}</span></div>`).join("");
+  buildScene(shots[0].scene);
+  spawn(shots[0].hero,shots[0].partner?-0.95:0,false,shots[0].heroAct);
+  if(shots[0].partner) spawn(shots[0].partner,0.95,true,shots[0].partnerAct);
+  renderFrame(shots[0],0.5,false,0);
+  show(msg1,"ok",shots.length+" shots taiyar. "+(msgText||"")+" Ab 2 ya 3 dabao (awaaz chalne se pehle download hogi).");
 }
 
 document.getElementById("make").onclick=async ()=>{
@@ -611,7 +623,7 @@ document.getElementById("make").onclick=async ()=>{
 Ise ${n} shots me todo (3D cartoon).
 Har shot: {"text":"subtitle 6-8 shabd Hinglish","say":"dialogue ek chhoti line (max 12 shabd)","speaker":"Boy|Girl|Narrator",
 "scene":"jungle|cave|night|river","hero":"boy|girl|man|robot","partner":"girl|boy|(khaali)",
-"hero_action":"walk|run|idle|scared|happy|wave","partner_action":"walk|run|idle|scared|happy|wave","cam":0}
+"hero_action":"walk|run|idle|scared|happy|wave|jump|dance|point","partner_action":"walk|run|idle|scared|happy|wave|jump|dance|point","cam":0}
 cam: 0=dolly in, 1=side, 2=high wide, 3=angle.
 Sirf JSON: {"title":"...","shots":[...]}`);
     const d=parseJSON(raw);
@@ -674,8 +686,8 @@ async function playFilm(record){
       };
       renderFrame(shots[0],0,false,0);
       recorder.start(400);
-      const sb=document.getElementById("stopbtn"); if(sb) sb.style.display="block";
-      show(msg2,"info","Record ho raha hai… (Roko dabao to yahin ruk jayega)");
+      { const sb=document.getElementById("stopbtn"); if(sb) sb.style.display="block"; }
+      show(msg2,"info","Record ho raha hai…");
     }else show(msg2,"info","Film chal rahi hai…");
 
     // 3) shots
@@ -721,9 +733,262 @@ async function playFilm(record){
 
 document.getElementById("play").onclick=()=>playFilm(false);
 document.getElementById("rec").onclick=()=>playFilm(true);
-const stopBtnEl=document.getElementById("stopbtn");
-if(stopBtnEl) stopBtnEl.onclick=()=>{ stopFlag=true; show(msg2,"info","Rok rahe hain…"); };
+{ const sb=document.getElementById("stopbtn"); if(sb) sb.onclick=()=>{ stopFlag=true; show(msg2,"info","Rok rahe hain…"); }; }
 if(init3D()){ buildScene("jungle"); spawn("boy",0,false,"idle"); renderFrame({text:"",say:"",cam:0},0.5,false,0); }
 </script>
+
+<style>
+.v5-card{border-color:#36533d;background:linear-gradient(145deg,#151e1a,#161b22)}
+.v5-heading{display:flex;justify-content:space-between;align-items:center;font:800 11px "Azeret Mono",monospace;letter-spacing:.08em;color:#9bd7a5;margin-bottom:8px}
+.v5-chip{font-size:10px;border:1px solid #3fb950;color:#3fb950;border-radius:30px;padding:3px 8px}
+.v5-help{font-size:13px;color:#c6d1cc;margin:4px 0 12px}
+.v5-note{font-size:12px;color:var(--dim);line-height:1.55;margin-top:9px}
+.v5-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.v5-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.v5-row button{flex:1;min-width:120px}
+.v5-status{font-size:12px;color:var(--green)}
+.v5-timeline{display:grid;gap:9px;margin-top:12px}
+.v5-shot{border:1px solid var(--line);border-radius:11px;padding:10px;background:#10161d}
+.v5-shot-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.v5-shot-title{font:700 12px "Azeret Mono",monospace;color:#9bd7a5}
+.v5-shot-actions{display:flex;gap:5px}
+.v5-shot-actions button{padding:6px 9px;font-size:12px;min-width:0}
+.v5-shot-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.v5-shot-fields .wide{grid-column:1/-1}
+.v5-shot label{margin:0 0 4px}
+.v5-shot input,.v5-shot select{padding:8px;font-size:13px}
+.v5-shot textarea{min-height:52px;padding:8px;font-size:13px}
+@media(max-width:520px){.v5-grid,.v5-shot-fields{grid-template-columns:1fr}.v5-shot-fields .wide{grid-column:auto}}
+</style>
+<script>
+/* Seetal V5 hybrid layer: editable timeline, project files and optional imported GLB characters. */
+(function(){
+  "use strict";
+  const $=id=>document.getElementById(id);
+  let importedTemplate=null, importedAnimations=[], importedBlobUrl=null, importedName="";
+  let modelLoadToken=0;
+
+  function v5Message(text, good=true){
+    const box=$("msg1");
+    if(box){ box.className="msg show "+(good?"ok":"info"); box.textContent=text; }
+  }
+  function safeText(v){ return String(v==null?"":v); }
+
+  function refreshTimeline(){
+    const host=$("timeline");
+    if(!host) return;
+    if(!Array.isArray(shots)||!shots.length){
+      host.innerHTML='<div class="v5-note">Pehle AI plan ya Demo plan banayein.</div>';
+      return;
+    }
+    host.innerHTML="";
+    shots.forEach((s,i)=>{
+      const card=document.createElement("div");
+      card.className="v5-shot";
+      card.innerHTML=`
+        <div class="v5-shot-top">
+          <span class="v5-shot-title">SCENE ${i+1}</span>
+          <div class="v5-shot-actions">
+            <button type="button" data-act="up" data-i="${i}" title="Move up">↑</button>
+            <button type="button" data-act="down" data-i="${i}" title="Move down">↓</button>
+            <button type="button" data-act="duplicate" data-i="${i}">Copy</button>
+            <button type="button" data-act="delete" data-i="${i}">Delete</button>
+          </div>
+        </div>
+        <div class="v5-shot-fields">
+          <div class="wide"><label>Subtitle / scene description</label><input data-field="text" data-i="${i}" value="${escapeAttr(s.text)}"></div>
+          <div class="wide"><label>Hindi dialogue</label><textarea data-field="say" data-i="${i}">${escapeHtml(s.say)}</textarea></div>
+          <div><label>Speaker</label><select data-field="speaker" data-i="${i}">
+            ${["Boy","Girl","Narrator","Man","Robot"].map(x=>`<option ${s.speaker===x?"selected":""}>${x}</option>`).join("")}
+          </select></div>
+          <div><label>Location</label><select data-field="scene" data-i="${i}">
+            ${["jungle","cave","night","river"].map(x=>`<option value="${x}" ${s.scene===x?"selected":""}>${x}</option>`).join("")}
+          </select></div>
+          <div><label>Main character</label><select data-field="hero" data-i="${i}">
+            ${["boy","girl","man","robot"].map(x=>`<option value="${x}" ${s.hero===x?"selected":""}>${x}</option>`).join("")}
+          </select></div>
+          <div><label>Partner</label><select data-field="partner" data-i="${i}">
+            ${["","boy","girl","man","robot"].map(x=>`<option value="${x}" ${s.partner===x?"selected":""}>${x||"None"}</option>`).join("")}
+          </select></div>
+          <div><label>Main action</label><select data-field="heroAct" data-i="${i}">
+            ${ACTIONS.map(x=>`<option value="${x}" ${s.heroAct===x?"selected":""}>${x}</option>`).join("")}
+          </select></div>
+          <div><label>Partner action</label><select data-field="partnerAct" data-i="${i}">
+            ${ACTIONS.map(x=>`<option value="${x}" ${s.partnerAct===x?"selected":""}>${x}</option>`).join("")}
+          </select></div>
+          <div><label>Camera</label><select data-field="cam" data-i="${i}">
+            ${["0 · Dolly","1 · Side","2 · Wide","3 · Angle"].map((x,n)=>`<option value="${n}" ${Number(s.cam)===n?"selected":""}>${x}</option>`).join("")}
+          </select></div>
+        </div>`;
+      host.appendChild(card);
+    });
+  }
+  function escapeHtml(v){return safeText(v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+  function escapeAttr(v){return escapeHtml(v).replace(/'/g,"&#39;");}
+
+  $("timeline")?.addEventListener("input",e=>{
+    const el=e.target, i=Number(el.dataset.i), field=el.dataset.field;
+    if(!field||!shots[i]) return;
+    shots[i][field]=field==="cam"?Number(el.value):el.value;
+    voiceCache.clear();
+  });
+  $("timeline")?.addEventListener("change",e=>{
+    const el=e.target, i=Number(el.dataset.i), field=el.dataset.field;
+    if(!field||!shots[i]) return;
+    shots[i][field]=field==="cam"?Number(el.value):el.value;
+    voiceCache.clear();
+    if(i===0) previewCurrent();
+  });
+  $("timeline")?.addEventListener("click",e=>{
+    const b=e.target.closest("button[data-act]");
+    if(!b) return;
+    const i=Number(b.dataset.i), action=b.dataset.act;
+    if(!shots[i]) return;
+    if(action==="up"&&i>0) [shots[i-1],shots[i]]=[shots[i],shots[i-1]];
+    if(action==="down"&&i<shots.length-1) [shots[i+1],shots[i]]=[shots[i],shots[i+1]];
+    if(action==="duplicate") shots.splice(i+1,0,JSON.parse(JSON.stringify(shots[i])));
+    if(action==="delete"&&shots.length>1) shots.splice(i,1);
+    refreshTimeline(); previewCurrent();
+  });
+
+  function previewCurrent(){
+    try{
+      if(!shots.length||!init3D()) return;
+      const s=shots[0];
+      buildScene(s.scene);
+      spawn(s.hero,s.partner?-0.95:0,false,s.heroAct);
+      if(s.partner) spawn(s.partner,0.95,true,s.partnerAct);
+      renderFrame(s,0.45,false,0);
+    }catch(e){ console.warn("Preview:",e); }
+  }
+
+  $("addShot")?.addEventListener("click",()=>{
+    if(!shots.length){ v5Message("Pehle AI plan ya Demo plan banayein.",false); return; }
+    const last=shots[shots.length-1];
+    shots.push({...last,text:"Naya scene",say:"",speaker:"Narrator",cam:0});
+    refreshTimeline();
+    v5Message("Naya scene add ho gaya. Timeline mein edit karein.");
+  });
+
+  $("saveProject")?.addEventListener("click",()=>{
+    if(!shots.length){ v5Message("Save karne se pehle scene plan banayein.",false); return; }
+    const project={
+      format:"Seetal3DProject",version:5,createdAt:new Date().toISOString(),
+      title:"Seetal Cartoon Project",story:$("topic")?.value||"",
+      shots:shots,settings:{shotSeconds:$("secs")?.value||"5000",characterSource:$("characterSource")?.value||"procedural"}
+    };
+    const blob=new Blob([JSON.stringify(project,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download="seetal-v5-project.json";a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+    v5Message("Project JSON save ho gaya. Ismein scene plan aur dialogues hain; imported 3D model alag se rakhna hoga.");
+  });
+  $("loadProjectBtn")?.addEventListener("click",()=>$("loadProjectFile")?.click());
+  $("loadProjectFile")?.addEventListener("change",async e=>{
+    const file=e.target.files?.[0]; if(!file) return;
+    try{
+      const p=JSON.parse(await file.text());
+      if(p.format!=="Seetal3DProject"||!Array.isArray(p.shots)) throw new Error("Yeh Seetal V5 project JSON nahi hai.");
+      $("topic").value=p.story||"";
+      shots=normShots(p.shots);
+      if(p.settings?.shotSeconds) $("secs").value=p.settings.shotSeconds;
+      voiceCache.clear(); refreshTimeline(); previewCurrent();
+      v5Message("Project load ho gaya: "+shots.length+" scenes.");
+    }catch(err){v5Message("Project load nahi hua: "+err.message,false);}
+    e.target.value="";
+  });
+
+  function disposeObject(obj){
+    obj.traverse?.(n=>{
+      if(n.geometry) n.geometry.dispose();
+      if(n.material) (Array.isArray(n.material)?n.material:[n.material]).forEach(m=>m.dispose?.());
+    });
+  }
+  function setModelStatus(t,ok=true){
+    const el=$("modelStatus"); if(el){el.textContent=t;el.style.color=ok?"var(--green)":"var(--amber)";}
+  }
+  $("modelFile")?.addEventListener("change",e=>{
+    const file=e.target.files?.[0]; if(!file) return;
+    if(typeof THREE==="undefined"||typeof THREE.GLTFLoader!=="function"){
+      setModelStatus("GLTF loader unavailable — internet se loader load karein.",false); return;
+    }
+    const token=++modelLoadToken;
+    if(importedBlobUrl) URL.revokeObjectURL(importedBlobUrl);
+    importedBlobUrl=URL.createObjectURL(file);
+    setModelStatus("3D model load ho raha hai…");
+    const loader=new THREE.GLTFLoader();
+    loader.load(importedBlobUrl,gltf=>{
+      if(token!==modelLoadToken){disposeObject(gltf.scene);return;}
+      if(importedTemplate) disposeObject(importedTemplate);
+      importedTemplate=gltf.scene;
+      importedAnimations=gltf.animations||[];
+      importedName=file.name;
+      // Normalize model height to about 2.0 world units and place its feet on ground.
+      const box=new THREE.Box3().setFromObject(importedTemplate);
+      const size=new THREE.Vector3();box.getSize(size);
+      const h=Math.max(size.y,0.001);
+      importedTemplate.scale.setScalar(2.0/h);
+      const box2=new THREE.Box3().setFromObject(importedTemplate);
+      importedTemplate.position.y-=box2.min.y;
+      $("characterSource").value="imported";
+      setModelStatus("Loaded: "+file.name+" · "+importedAnimations.length+" animation clips");
+      previewCurrent();
+    },undefined,err=>{
+      console.error(err);setModelStatus("Model load fail. GLB format check karein.",false);
+    });
+  });
+  $("clearModel")?.addEventListener("click",()=>{
+    modelLoadToken++;
+    if(importedTemplate){disposeObject(importedTemplate);importedTemplate=null;}
+    importedAnimations=[];
+    if(importedBlobUrl){URL.revokeObjectURL(importedBlobUrl);importedBlobUrl=null;}
+    $("modelFile").value="";$("characterSource").value="procedural";
+    setModelStatus("Built-in character active");previewCurrent();
+  });
+
+  // Replace spawn with an imported-model-aware version while preserving V4's procedural fallback.
+  const originalSpawn=spawn;
+  spawn=function(kind,x,faceLeft,action){
+    if($("characterSource")?.value!=="imported"||!importedTemplate) return originalSpawn(kind,x,faceLeft,action);
+    const root=THREE.SkeletonUtils?.clone ? THREE.SkeletonUtils.clone(importedTemplate) : importedTemplate.clone(true);
+    root.position.set(x,0,0);
+    const two=Math.abs(x)>0.01, yaw=two?0.55:0.8;
+    root.rotation.y=faceLeft?-yaw:yaw;
+    scene.add(root);
+    let mixer=null, actionClip=null;
+    if(importedAnimations.length){
+      mixer=new THREE.AnimationMixer(root);
+      const wanted=action==="run"?/run/i:action==="idle"?/idle/i:/walk/i;
+      actionClip=importedAnimations.find(c=>wanted.test(c.name))||importedAnimations[0];
+      if(actionClip) mixer.clipAction(actionClip).play();
+    }
+    const p={root,x0:x,kind,dir:faceLeft?-1:1,two,action:ACTIONS.includes(action)?action:"walk",
+      phase:Math.random()*3,lastS:false,external:true,mixer};
+    people.push(p);
+    stchar.textContent=people.length+" imported character";
+    stchar.style.color="var(--green)";
+    return p;
+  };
+  const originalRenderFrame=renderFrame;
+  renderFrame=function(shot,t,speaking,sec){
+    people.forEach(p=>{
+      if(!p.external) return;
+      const moving=p.action==="walk"||p.action==="run";
+      p.root.position.x=p.x0+(moving?(t-0.5)*(p.two?0.8:1.6)*p.dir:0);
+    });
+    originalRenderFrame(shot,t,speaking,sec);
+  };
+
+  // Timeline is rebuilt after both AI and demo plans.
+  const oldApplyShots=applyShots;
+  applyShots=function(list,msgText){
+    oldApplyShots(list,msgText);
+    refreshTimeline();
+  };
+  // First-run preview and safety note.
+  setTimeout(()=>refreshTimeline(),0);
+})();
+</script>
+
 </body>
 </html>
