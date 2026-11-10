@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seetal Film Maker v2 — chalti film</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f1216;--surface:#171c22;--surface2:#202832;--line:#2c3641;--text:#eaf0f6;--dim:#93a3b3;
+ --green:#4caf50;--green-bg:#16241a;--red:#e57373;--blue:#64b5f6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;font-size:15px;line-height:1.5}
+.wrap{max-width:720px;margin:0 auto;padding:18px 16px 60px}
+h1{font-size:21px;margin:0 0 2px;font-weight:800}
+.sub{color:var(--dim);font-size:13.5px;margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+label{font-family:"Azeret Mono",monospace;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:6px}
+input,select{width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-family:inherit;font-size:14.5px}
+button{font-family:inherit;font-size:14px;font-weight:700;padding:12px 16px;border-radius:10px;border:none;background:var(--surface2);color:var(--text);cursor:pointer}
+button:hover:not(:disabled){background:var(--line)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.go{background:var(--green);color:#0b1a0b;width:100%;margin-top:10px}
+.stage{background:#000;border-radius:12px;overflow:hidden;aspect-ratio:9/16;max-height:60vh;margin:0 auto}
+canvas{width:100%;height:100%;display:block}
+.msg{margin-top:10px;padding:10px 12px;border-radius:9px;font-size:13.5px;display:none;white-space:pre-wrap}
+.msg.show{display:block}
+.msg.ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green)}
+.msg.bad{background:#2b1a1a;color:var(--red);border:1px solid var(--red)}
+.msg.info{background:var(--surface2);color:var(--dim);border:1px dashed var(--line)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.row button{flex:1;min-width:130px}
+.shots{margin-top:10px;font-size:13px;color:var(--dim);max-height:130px;overflow:auto}
+.shots div{padding:6px 0;border-bottom:1px dashed var(--line)}
+.foot{color:var(--dim);font-size:12.5px;margin-top:16px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Seetal Film Maker <span style="font-size:12px;color:var(--dim);font-family:'Azeret Mono',monospace">v2</span></h1>
+  <div class="sub">Ab film sach me chalti hai — scenes badalte hain, character chalta hai, awaaz saath chalti hai. Sab free.</div>
+
+  <div class="card">
+    <label>Kis par film banao?</label>
+    <input id="topic" placeholder="jaise: jungle mein khoya hua chhota robot">
+    <div class="row">
+      <div style="flex:1;min-width:120px"><label>Shots</label>
+        <select id="nshots"><option>4</option><option selected>5</option><option>6</option><option>8</option></select></div>
+      <div style="flex:1;min-width:120px"><label>Har shot</label>
+        <select id="secs"><option value="3000">3 sec</option><option value="4000" selected>4 sec</option><option value="5000">5 sec</option></select></div>
+    </div>
+    <button class="go" id="make">1. Kahani banao</button>
+    <div class="msg" id="msg1"></div>
+    <div class="shots" id="shots"></div>
+  </div>
+
+  <div class="card">
+    <div class="stage"><canvas id="cv" width="720" height="1280"></canvas></div>
+    <div class="row">
+      <button id="play">2. Film chalao</button>
+      <button id="rec">3. Record + download</button>
+    </div>
+    <div class="msg" id="msg2"></div>
+  </div>
+
+  <div class="foot">
+    Kaise chalti hai: Groq kahani likhta hai (free), scenes canvas par bante hain — badal, ped, chalta hua character (emoji), aur awaaz phone ki TTS deti hai. Koi image API nahi, isliye "free limit" wali dikkat nahi aayegi. Recording me awaaz nahi jaati (browser rok deta hai), par film chalte waqt awaaz sunai degi.
+  </div>
+</div>
+
+<script>
+const KSTORE="seetal-keys-v1";
+const GROQ={base:"https://api.groq.com/openai/v1", model:"qwen/qwen3.8-27b"};
+const cv=document.getElementById("cv"), ctx=cv.getContext("2d");
+const msg1=document.getElementById("msg1"), msg2=document.getElementById("msg2");
+let shots=[], blobUrl=null, recorder=null, chunks=[], running=false;
+
+function show(el,cls,txt){ el.className="msg show "+cls; el.textContent=txt; }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function key(){ try{ const s=JSON.parse(localStorage.getItem(KSTORE)||"{}"); return (s.keys&&(s.keys.groq||s.keys.openrouter))||""; }catch(e){ return ""; } }
+
+function parseJSON(t){
+  t=String(t||"").trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+  const a=t.indexOf("{"), b=t.lastIndexOf("}");
+  if(a>=0&&b>a) t=t.slice(a,b+1);
+  return JSON.parse(t);
+}
+
+async function askGroq(prompt){
+  const k=key();
+  if(!k) throw new Error("Groq key nahi mili — Simple Agent page par key save karo, phir yahan aao.");
+  const r=await fetch(GROQ.base+"/chat/completions",{
+    method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+k},
+    body:JSON.stringify({model:GROQ.model,temperature:0.85,max_tokens:1400,
+      messages:[{role:"system",content:"Tum bachchon ke liye kahani likhne wale director ho. Sirf JSON do."},{role:"user",content:prompt}]})});
+  if(!r.ok) throw new Error("Groq HTTP "+r.status+" — "+(await r.text()).slice(0,110));
+  const j=await r.json();
+  return (j.choices&&j.choices[0]&&j.choices[0].message.content)||"";
+}
+
+/* ---------- scene ka data ---------- */
+const SCENES={
+  jungle:{sky:["#8fd3f4","#c9f0d0"],ground:"#2e7d32",tree:"🌴",extra:"🌿",sun:"☀️"},
+  city:{sky:["#3a4a6b","#7d6b8f"],ground:"#4a4a4a",tree:"🏢",extra:"🚦",sun:"🌇"},
+  space:{sky:["#0b1030","#241a4d"],ground:"#3b3b5c",tree:"⭐",extra:"🪐",sun:"🌙"},
+  room:{sky:["#f6d5b8","#ffe9d6"],ground:"#b98a5e",tree:"🪟",extra:"🛋️",sun:"💡"},
+  village:{sky:["#ffd89b","#ffb26b"],ground:"#8d6e63",tree:"🏡",extra:"🌾",sun:"🌤️"},
+  sea:{sky:["#87ceeb","#b3e5fc"],ground:"#0277bd",tree:"⛵",extra:"🐟",sun:"☀️"}
+};
+const HEROES=["🤖","🐒","🐘","🦁","👦","👧","🐰","🦊","🐧","🧒"];
+const FIX={"robot":"🤖","boy":"👦","girl":"👧","monkey":"🐒","elephant":"🐘","lion":"🦁","rabbit":"🐰","fox":"🦊","penguin":"🐧","child":"🧒","kid":"🧒","robot":"🤖"};
+
+function pickScene(s){
+  const t=String(s||"").toLowerCase();
+  for(const k of Object.keys(SCENES)) if(t.includes(k)) return k;
+  if(/space|star|moon|planet/.test(t)) return "space";
+  if(/city|market|road|traffic/.test(t)) return "city";
+  if(/room|home|ghar|house/.test(t)) return "room";
+  if(/village|khet|farm/.test(t)) return "village";
+  if(/sea|beach|river|water/.test(t)) return "sea";
+  return "jungle";
+}
+function pickHero(s){
+  const t=String(s||"").toLowerCase();
+  for(const k of Object.keys(FIX)) if(t.includes(k)) return FIX[k];
+  return HEROES[Math.abs(hash(t))%HEROES.length];
+}
+function hash(s){ let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return h; }
+
+/* ---------- drawing ---------- */
+function drawScene(idx, t){           // t = 0..1 shot ke andar
+  const shot=shots[idx]||{};
+  const sc=SCENES[shot.scene||"jungle"];
+  const W=cv.width, H=cv.height;
+
+  // sky
+  const g=ctx.createLinearGradient(0,0,0,H*0.72);
+  g.addColorStop(0,sc.sky[0]); g.addColorStop(1,sc.sky[1]);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  // sun / moon
+  ctx.font="70px serif"; ctx.textAlign="center";
+  ctx.globalAlpha=0.9;
+  ctx.fillText(sc.sun, W*0.8, H*0.16);
+  ctx.globalAlpha=1;
+
+  // clouds (move)
+  ctx.globalAlpha=0.85; ctx.font="78px serif";
+  for(let i=0;i<3;i++){
+    const x=((t*0.35 + i*0.4)%1.3-0.15)*W;
+    ctx.fillText("☁️", x, H*(0.12+i*0.08));
+  }
+  ctx.globalAlpha=1;
+
+  // door ki pahadiyan
+  ctx.fillStyle="rgba(0,0,0,.10)";
+  ctx.beginPath(); ctx.ellipse(W*0.25,H*0.66,W*0.45,H*0.10,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(W*0.80,H*0.66,W*0.40,H*0.08,0,0,Math.PI*2); ctx.fill();
+
+  // ground
+  ctx.fillStyle=sc.ground;
+  ctx.fillRect(0,H*0.66,W,H*0.34);
+  // ghaas
+  ctx.fillStyle="rgba(255,255,255,.12)";
+  for(let i=0;i<24;i++){ const gx=(i*0.043*W + t*8)%W; ctx.fillRect(gx, H*0.66+8+(i%3)*22, 3, 12); }
+
+  // trees / buildings (parallax)
+  ctx.font="86px serif";
+  for(let i=0;i<5;i++){
+    const base=(i*0.22 + (shot.seed||0)*0.07)%1;
+    const x=(base - t*0.06 + 1)%1*W;
+    const y=H*0.68 + (i%2)*10;
+    ctx.fillText(sc.tree, x, y);
+  }
+
+  // hero — chalta hua
+  const hero=shot.hero||"🤖";
+  const px = W*0.12 + t*W*0.62;
+  const bob = Math.sin(t*Math.PI*6)*14;
+  const py = H*0.56 + bob;
+  // shadow
+  ctx.fillStyle="rgba(0,0,0,.22)";
+  ctx.beginPath(); ctx.ellipse(px, H*0.615, 54, 14, 0, 0, Math.PI*2); ctx.fill();
+  ctx.font="150px serif"; ctx.textAlign="center";
+  ctx.fillText(hero, px, py);
+
+  // chhote particles (chamak)
+  ctx.font="26px serif"; ctx.globalAlpha=0.7;
+  for(let i=0;i<6;i++){
+    const x=(i*0.17 + t*0.5)%1*W;
+    const y=H*0.46 + Math.sin((t*3+i)*2)*30 + i*26;
+    ctx.fillText(i%2?"✨":"🌼", x, y);
+  }
+  ctx.globalAlpha=1;
+
+  // text
+  if(shot.text){
+    ctx.font="800 42px Manrope, sans-serif"; ctx.textAlign="center";
+    const lines=wrap(shot.text, W-70, ctx);
+    const lh=54, boxH=lines.length*lh+34;
+    const alpha = Math.min(1, t*6) * Math.min(1,(1-t)*6);
+    ctx.globalAlpha=Math.max(0.15, alpha);
+    ctx.fillStyle="rgba(0,0,0,.55)";
+    ctx.fillRect(20, H-60-boxH, W-40, boxH);
+    ctx.fillStyle="#fff";
+    let y=H-60-boxH+44;
+    lines.forEach(l=>{ ctx.fillText(l, W/2, y); y+=lh; });
+    ctx.globalAlpha=1;
+  }
+
+  // progress
+  ctx.fillStyle="rgba(255,255,255,.25)";
+  ctx.fillRect(0,H-8,W,8);
+  ctx.fillStyle="#4caf50";
+  ctx.fillRect(0,H-8,W*((idx+t)/shots.length),8);
+}
+
+function wrap(text,maxW,c){
+  const words=String(text).split(/\s+/); const lines=[]; let cur="";
+  words.forEach(w=>{ const t2=cur?cur+" "+w:w; if(c.measureText(t2).width>maxW&&cur){lines.push(cur);cur=w;} else cur=t2; });
+  if(cur) lines.push(cur); return lines;
+}
+
+/* ---------- story ---------- */
+document.getElementById("make").onclick=async ()=>{
+  const topic=document.getElementById("topic").value.trim();
+  if(!topic){ show(msg1,"bad","Pehle topic likho."); return; }
+  const n=document.getElementById("nshots").value;
+  show(msg1,"info","Kahani likhi ja rahi hai…");
+  try{
+    const raw=await askGroq(`Topic: "${topic}"
+${n} shots ki chhoti kahani banao jo 5 saal ke bachche bhi samajh lein.
+Har shot: {"text":"screen par 6-8 shabd","say":"voice-over ek line (Hinglish)","scene":"jungle|city|space|room|village|sea","hero":"robot|boy|girl|monkey|elephant|lion|rabbit|fox|penguin"}
+Kahani ka flow ho: shuru, dikkat, madad, khushi.
+Sirf JSON: {"title":"...","shots":[...]}`);
+    const data=parseJSON(raw);
+    shots=(data.shots||[]).map((s,i)=>({text:s.text||"", say:s.say||s.text||"", scene:pickScene(s.scene+" "+(s.hero||"")), hero:pickHero(s.hero||s.text||""), seed:i+1}));
+    if(!shots.length) throw new Error("kahani khaali aayi");
+    document.getElementById("shots").innerHTML=shots.map((s,i)=>
+      `<div><b>${i+1}.</b> ${esc(s.text)} <span style="opacity:.6">· ${esc(s.say)}</span></div>`).join("");
+    show(msg1,"ok","Kahani taiyar — "+shots.length+" scenes. Ab 'Film chalao' dabao.");
+    drawScene(0,0.5);
+  }catch(e){ show(msg1,"bad","Ruk gaya: "+e.message); }
+};
+
+/* ---------- playback ---------- */
+async function playFilm(record){
+  if(!shots.length){ show(msg2,"bad","Pehle step 1 dabao."); return; }
+  if(running) return; running=true;
+  const per=parseInt(document.getElementById("secs").value,10);
+
+  if(record){
+    const stream=cv.captureStream(30);
+    const mime=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
+    chunks=[]; recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:3500000});
+    recorder.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
+    recorder.onstop=()=>{
+      const blob=new Blob(chunks,{type:"video/webm"});
+      if(blobUrl) URL.revokeObjectURL(blobUrl);
+      blobUrl=URL.createObjectURL(blob);
+      const a=document.createElement("a"); a.href=blobUrl; a.download="seetal-film-"+Date.now()+".webm";
+      document.body.appendChild(a); a.click(); a.remove();
+      show(msg2,"ok","Video ban gayi aur download shuru — "+(blob.size/1048576).toFixed(2)+" MB");
+    };
+    recorder.start(400);
+    show(msg2,"info","Record ho raha hai…");
+  }else{
+    show(msg2,"info","Film chal rahi hai…");
+  }
+
+  // title card
+  await drawTitle(1400);
+
+  for(let i=0;i<shots.length;i++){
+    const s=shots[i];
+    if(s.say && window.speechSynthesis){
+      try{ const u=new SpeechSynthesisUtterance(s.say); u.lang="hi-IN"; u.rate=0.92; speechSynthesis.speak(u); }catch(e){}
+    }
+    await new Promise(res=>{
+      const t0=performance.now();
+      (function loop(){
+        const t=Math.min(1,(performance.now()-t0)/per);
+        drawScene(i,t);
+        if(t<1) requestAnimationFrame(loop); else res();
+      })();
+    });
+  }
+  await drawEnd(1600);
+
+  if(record && recorder && recorder.state!=="inactive") recorder.stop();
+  running=false;
+  if(!record) show(msg2,"ok","Film poori chali — ab record dabao to video file banegi.");
+}
+
+function drawTitle(ms){
+  return new Promise(res=>{
+    const t0=performance.now();
+    (function loop(){
+      const t=Math.min(1,(performance.now()-t0)/ms);
+      const g=ctx.createLinearGradient(0,0,0,cv.height);
+      g.addColorStop(0,"#12202e"); g.addColorStop(1,"#0a1218");
+      ctx.fillStyle=g; ctx.fillRect(0,0,cv.width,cv.height);
+      ctx.textAlign="center"; ctx.fillStyle="#eaf0f6";
+      ctx.font="800 52px Manrope, sans-serif";
+      const title=(document.getElementById("topic").value||"Seetal Film").slice(0,40);
+      wrap(title,cv.width-80,ctx).forEach((l,i)=>ctx.fillText(l,cv.width/2,cv.height/2-20+i*62));
+      ctx.font="26px Manrope, sans-serif"; ctx.fillStyle="#93a3b3";
+      ctx.fillText("Seetal Film Maker", cv.width/2, cv.height/2+90);
+      ctx.globalAlpha=Math.min(1,t*3);
+      ctx.fillStyle="#4caf50"; ctx.font="44px serif"; ctx.fillText("🎬", cv.width/2, cv.height/2+170);
+      ctx.globalAlpha=1;
+      if(t<1) requestAnimationFrame(loop); else res();
+    })();
+  });
+}
+function drawEnd(ms){
+  return new Promise(res=>{
+    const t0=performance.now();
+    (function loop(){
+      const t=Math.min(1,(performance.now()-t0)/ms);
+      ctx.fillStyle="#0a1218"; ctx.fillRect(0,0,cv.width,cv.height);
+      ctx.textAlign="center"; ctx.fillStyle="#eaf0f6"; ctx.font="800 46px Manrope, sans-serif";
+      ctx.fillText("Samajh gaye?", cv.width/2, cv.height/2-10);
+      ctx.font="30px Manrope, sans-serif"; ctx.fillStyle="#93a3b3";
+      ctx.fillText("Kahani poori hui 🌟", cv.width/2, cv.height/2+50);
+      if(t<1) requestAnimationFrame(loop); else res();
+    })();
+  });
+}
+
+document.getElementById("play").onclick=()=>playFilm(false);
+document.getElementById("rec").onclick=()=>playFilm(true);
+drawScene(0,0.5);
+</script>
+</body>
+</html>
