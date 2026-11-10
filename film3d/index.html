@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Seetal 3D Cartoon Studio V9 Bharat: kahani likho, ek button dabao — 3D cartoon film, Hindi/Indic awaaz, video download. Sab free.">
-<title>Seetal 3D Cartoon Studio V9 — Bharat Edition</title>
+<meta name="description" content="Seetal 3D Cartoon Studio V5 Hybrid: AI story planning, editable scenes, imported GLB characters and phone-side video rendering.">
+<title>Seetal 3D Cartoon Studio V10 — Natural Voice</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -44,7 +44,7 @@ canvas{width:100%;height:100%;display:block}
 </head>
 <body>
 <div class="wrap">
-  <h1>Seetal 3D Cartoon Studio <span style="font-size:12px;color:var(--green);font-family:'Azeret Mono',monospace">V9 BHARAT</span></h1>
+  <h1>Seetal 3D Cartoon Studio <span style="font-size:12px;color:var(--green);font-family:'Azeret Mono',monospace">V10 VOICE</span></h1>
   <div class="sub">Bas kahani likho aur ek button dabao — Hindi, Bangla, Tamil, Telugu, Marathi… sab bhasha khud pehchani jaati hai.</div>
 
   <div class="card">
@@ -419,13 +419,50 @@ async function getVoice(text){
   const a=await fetchVoice(text); if(a) voiceCache.set(langOf(text)+"|"+text,a);
   return a;
 }
+/* natural awaaz: repo ke sounds/voices/manifest.json se (edge-tts neural) */
+let voiceManifest=null;
+async function loadVoiceManifest(){
+  if(voiceManifest) return voiceManifest;
+  voiceManifest={};
+  for(const base of ["sounds/voices/manifest.json","../sounds/voices/manifest.json"]){
+    try{
+      const r=await fetch(base+"?v="+Date.now());
+      if(!r.ok) continue;
+      const j=await r.json();
+      (j.lines||[]).forEach(ln=>{ if(ln.text && ln.file){ voiceManifest[ln.text.trim()]=(base.split("manifest.json")[0])+ln.file.split("/").pop(); } });
+      break;
+    }catch(e){}
+  }
+  return voiceManifest;
+}
+async function naturalVoice(text){
+  const man=await loadVoiceManifest();
+  const url=man[String(text||"").trim()];
+  if(!url) return null;
+  const key="natural|"+text;
+  if(voiceCache.has(key)) return voiceCache.get(key);
+  try{
+    const r=await fetch(url); if(!r.ok) return null;
+    const buf=await r.arrayBuffer();
+    if(buf.byteLength<1500) return null;
+    const audio=await audioCtx().decodeAudioData(buf);
+    voiceCache.set(key,audio);
+    return audio;
+  }catch(e){ return null; }
+}
+
 async function prefetchAll(){
   const texts=[...new Set(shots.map(s=>s.say).filter(Boolean))];
   let got=0;
   const queue=texts.slice();
-  const worker=async()=>{ while(queue.length){ const t=queue.shift(); if(await getVoice(t)) got++; } };
+  let natural=0;
+  const worker=async()=>{ while(queue.length){ const t=queue.shift();
+    const nv=await naturalVoice(t);
+    if(nv){ natural++; got++; }
+    else if(await getVoice(t)) got++;
+  } };
   await Promise.all([worker(),worker(),worker(),worker()]);
-  return {want:texts.length, got};
+  return {want:texts.length, got, natural};
 }
 const VOICE={boy:{rate:1.06},girl:{rate:1.12},man:{rate:0.94},robot:{rate:1.0},narrator:{rate:0.9},narratorhindi:{rate:0.9}};
 function voiceRate(who){ const k=String(who||"").toLowerCase().trim(); return (VOICE[k]||{rate:1.0}).rate; }
@@ -795,7 +832,7 @@ async function playFilm(record){
     show(msg2,"info","Awaaz taiyar ho rahi hai…");
     const v=await prefetchAll();
     voiceOK=v.want===0 || v.got>0;
-    stvoice.textContent = v.want?(v.got+"/"+v.want+" mp3 mili"):"—";
+    stvoice.textContent = v.want?((v.natural?v.natural+" natural + ":"")+(v.got)+"/"+v.want+" mp3"):"—";
     stvoice.style.color = v.got===v.want?"var(--green)":(v.got?"var(--amber)":"var(--red)");
 
     // 2) recorder
@@ -835,7 +872,7 @@ async function playFilm(record){
 
       let dur=per, speakMs=0;
       if(s.say){
-        const audio=voiceCache.get(langOf(s.say)+"|"+s.say);
+        const audio=voiceCache.get("natural|"+s.say) || voiceCache.get(langOf(s.say)+"|"+s.say);
         if(audio){ playBuffer(audio, voiceRate(s.speaker)); speakMs=audio.duration*1000; dur=Math.max(per,speakMs+900); }
         else{
           missing++;
