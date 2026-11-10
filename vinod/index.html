@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Vinod v12 — diagnostic report</title>
+<title>Agent Vinod v14 — agent</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -46,7 +46,7 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
 </head>
 <body>
 <div class="wrap">
-  <h1>Agent Vinod <span style="font-size:11px;color:var(--green);font-family:'Azeret Mono',monospace">v12 REPORT</span></h1>
+  <h1>Agent Vinod <span style="font-size:11px;color:var(--green);font-family:'Azeret Mono',monospace">v14 AGENT</span></h1>
   <div class="sub">Seetal ka worker — bada kaam karta hai, jhooth nahi bolta. Result ek "card" me deta hai jo Seetal ko wapas diya ja sakta hai.</div>
 
   <div class="card">
@@ -95,6 +95,8 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
           <option value="code">Code likho (single file)</option>
           <option value="fix">Bug fix / review</option>
           <option value="research">Research + summary</option>
+          <option value="agent">Agent (tools se khud kaam)</option>
+          <option value="sysfix">System check + fix (AI khud)</option>
         </select></div>
       <div style="flex:1;min-width:120px"><label>Model</label>
         <select id="modelSel"><option value="">(apne aap)</option></select></div>
@@ -127,8 +129,8 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
   </div>
 
   <div class="foot">
-    Vinod ke paas tools: time, calc, fetch_text (allowlist), make_app (file banata hai), notes.
-    Woh apna kaam khud jaanchta nahi kar sakta — isliye card me "TESTED: kuch nahi" likhta hai; asli jaanch Seetal karti hai.
+    Agent mode me Vinod khud tools chalata hai: system_check, lint_app (JS syntax), fetch_text, make_app, calc, notes.
+    Card ke "TESTED" me sirf wahi likha jaata hai jo tool ne asli me chalaya. Lint sirf syntax dekhta hai — behaviour ki jaanch alag se karni hogi.
   </div>
 </div>
 
@@ -151,12 +153,19 @@ const PROVIDERS=[
 let custom=[];
 try{ custom=JSON.parse(localStorage.getItem("vinod-custom-providers")||"[]"); }catch(e){ custom=[]; }
 
-const TOOLS=[["time_now","{}","aaj ka time"],["calc",'{"expr":"2+2"}',"ganit"],
- ["fetch_text",'{"url":"https://..."}',"allowlist se text"],["make_app",'{"name":"x.html","html":"..."}',"file banao"],
- ["notes_list","{}","notes"]];
+const TOOLS=[
+ ["time_now","{}","aaj ka time/date"],
+ ["calc",'{"expr":"2+2*3"}',"ganit (sirf numbers + Math, ^ = power)"],
+ ["fetch_text",'{"url":"https://en.wikipedia.org/wiki/India"}',"allowlist ya apni site ka text padho"],
+ ["system_check","{}","Seetal ke saare apps/files ka HTTP + size + speed check"],
+ ["lint_app",'{"url":"../film3d/"}',"app ke inline JS ka SYNTAX check (behaviour nahi)"],
+ ["make_app",'{"name":"x.html","html":"<!doctype html>..."}',"file banao + syntax check, download milega"],
+ ["notes_list","{}","notes padho"],
+ ["note_add",'{"text":"..."}',"note likho"]
+];
 const ALLOW=["raw.githubusercontent.com","en.wikipedia.org","api.github.com","data.gov.in"];
 
-let keys={}, health={}, models={}, lastCard="";
+let keys={}, health={}, models={}, lastCard="", errs={};
 (function loadKeys(){
   try{ const s=JSON.parse(localStorage.getItem(KSTORE)||"{}"); keys=s.keys||{}; health=s.health||{}; models=s.models||{}; }catch(e){}
   // primary khaali ho gaya? mirror se wapas laao
@@ -171,6 +180,7 @@ let keys={}, health={}, models={}, lastCard="";
     if(old.health) Object.keys(old.health).forEach(k=>{ if(!health[k]) health[k]=old.health[k]; });
   }catch(e){}
   // merge ko pakka karo — ab sab kuch ek hi store me
+  health={}; /* purana "chalu/fail" jhooth ho sakta hai — har session me dobara test hoga */
   try{ localStorage.setItem(KSTORE, JSON.stringify({keys,health,models})); }catch(e){}
 })();
 const save=()=>{
@@ -205,9 +215,12 @@ function renderProvRows(){
       <input id="k-${p.id}" type="password" placeholder="${esc(hint)}" value="">
       <span class="st" id="s-${p.id}">—</span>
       <button data-test="${p.id}" style="padding:6px 9px;font-size:11px">test</button>
+      <input id="m-${p.id}" placeholder="model: ${esc(models[p.id]||p.model||"auto")}" value="${esc(models[p.id]||"")}" style="width:100%;font-size:11px">
+      <div id="e-${p.id}" style="width:100%;font-size:11px;color:var(--red);font-family:'Azeret Mono',monospace"></div>
       ${BROWSER_OK[p.id]===false?'<span style="font-size:10px;color:var(--amber);width:100%">⚠ browser se nahi chalega (CORS) — server/proxy chahiye</span>':''}`;
     provEl.appendChild(row);
     row.querySelector("[data-test]").onclick=()=>testOne(p.id);
+    row.querySelector("#m-"+p.id).onchange=e=>{ const v=e.target.value.trim(); if(v) models[p.id]=v; else delete models[p.id]; health[p.id]=undefined; save(); paint(); };
     const inp=row.querySelector("#k-"+p.id);
     let tmr=null;
     inp.oninput=e=>{
@@ -235,11 +248,15 @@ function paint(){
   prov.forEach(p=>{
     const el=document.getElementById("s-"+p.id); if(!el) return;
     const h=health[p.id];
-    el.textContent = keys[p.id] ? (h==="ok"?"chalu":h==="bad"?"fail":h==="cors"?"CORS":"saved ✓") : "—";
+    el.textContent = keys[p.id] ? (h==="ok"?"chalu":h==="bad"?"fail":h==="cors"?"CORS":"bina test") : "—";
     el.className="st "+(h==="ok"?"ok":h==="bad"?"bad":h==="cors"?"bad":"");
+    const ee=document.getElementById("e-"+p.id);
+    if(ee) ee.textContent=((h==="bad"||h==="cors")&&errs[p.id])?("wajah: "+errs[p.id]):"";
   });
   const opts=prov.filter(p=>keys[p.id]).map(p=>`<option value="${p.id}">${p.name}${models[p.id]?" · "+models[p.id]:""}</option>`).join("");
+  const cur=selEl.value;
   selEl.innerHTML='<option value="">(apne aap)</option>'+opts;
+  if(cur && keys[cur]) selEl.value=cur;
 }
 paint();
 
@@ -258,7 +275,7 @@ Rules:
 async function geminiModel(key){
   if(models.gemini) return models.gemini;
   const r=await safeFetch(PROVIDERS[5].base+"/models?pageSize=200",{headers:{"x-goog-api-key":key}});
-  if(!r.ok) throw new Error("gemini models "+r.status);
+  if(!r.ok){ const raw=await r.text(); const er=new Error(explain(r.status,raw)); er.status=r.status; throw er; }
   const j=await r.json();
   const names=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent")).map(m=>String(m.name).replace(/^models\//,""));
   const score=n=>{let v=0;if(/flash/i.test(n))v+=4;if(/latest/i.test(n))v+=2;if(/preview|exp|thinking|lite|image|tts|audio|embed/i.test(n))v-=4;const m=n.match(/(\d+(?:\.\d+)?)/);v+=m?Number(m[1]):0;return v;};
@@ -273,52 +290,248 @@ function explain(status, raw){
   if(status===429 && (t.includes("quota")||t.includes("billing")||t.includes("insufficient")))
     return "account me credit/billing nahi hai (429) — is provider ka API paid hai";
   if(status===429) return "rate limit / free quota khatam (429) — thodi der baad ya doosri key";
-  if(status===404) return "model ka naam galat hai (404)";
+  if(status===404) return "model ka naam ya base URL galat hai (404)";
   if(status===400) return "request galat (400) — model naam ya format dekho";
   if(String(raw||"").includes("Failed to fetch")) return "internet ya CORS block — network check karo";
   return raw ? String(raw).slice(0,90) : "pata nahi kya hua";
 }
 
-async function safeFetch(url, opts){
-  try{ return await fetch(url, opts); }
-  catch(e){ const err=new Error("browser ne request rok di (CORS/network) — is provider ko server se hi call kiya ja sakta hai"); err.cors=true; throw err; }
+let FETCH_TIMEOUT=25000, RETRY_DELAY=700;
+async function safeFetch(url, opts, tries){
+  tries = tries==null ? 2 : tries;
+  let lastErr=null;
+  for(let i=0;i<tries;i++){
+    const ac = (typeof AbortController!=="undefined") ? new AbortController() : null;
+    const timer = ac ? setTimeout(()=>ac.abort(), FETCH_TIMEOUT) : null;
+    try{
+      const o=Object.assign({}, opts||{});
+      if(ac) o.signal=ac.signal;
+      const r=await fetch(url, o);
+      if(timer) clearTimeout(timer);
+      if((r.status>=500||r.status===408) && i<tries-1){ await sleep(RETRY_DELAY*(i+1)); continue; }
+      return r;
+    }catch(e){
+      if(timer) clearTimeout(timer);
+      const aborted = e && e.name==="AbortError";
+      const err=new Error(aborted ? ("jawab nahi aaya ("+Math.round(FETCH_TIMEOUT/1000)+"s timeout)")
+        : "browser ne request rok di (CORS/network) — is provider ko server se hi call kiya ja sakta hai");
+      if(aborted) err.timeout=true; else err.cors=true;
+      lastErr=err;
+      if(i<tries-1){ await sleep(RETRY_DELAY*(i+1)); continue; }
+      throw err;
+    }
+  }
+  throw lastErr||new Error("fetch fail");
+}
+
+function chatText(j){ return (j&&j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||""; }
+
+async function pickOpenAIModel(p){
+  const base=String(p.base).replace(/\/+$/,"");
+  const r=await safeFetch(base+"/models",{headers:{"Authorization":"Bearer "+keys[p.id]}},1);
+  if(!r.ok){ const raw=await r.text(); throw new Error(explain(r.status,raw)); }
+  const j=await r.json();
+  const ids=(j.data||[]).map(m=>m&&m.id).filter(id=>id && !/embed|whisper|tts|audio|image|moderation|guard|dall|rerank|transcribe|realtime|search|ocr/i.test(id));
+  if(!ids.length) throw new Error("is key ke liye koi chat model nahi mila");
+  const score=n=>{ let v=0; if(/instruct|chat|versatile|turbo|mini|flash|small|latest/i.test(n)) v+=3; if(/70b|72b|32b|large|pro|gpt-4o|gpt-5|llama-3/i.test(n)) v+=2; if(/preview|exp|beta|vision/i.test(n)) v-=2; return v; };
+  return ids.slice().sort((a,b)=>score(b)-score(a))[0];
 }
 
 async function callProvider(p, messages){
   const key=keys[p.id];
   if(p.kind==="gemini"){
-    const m=await geminiModel(key);
     const contents=messages.filter(x=>x.role!=="system").map(x=>({role:x.role==="assistant"?"model":"user",parts:[{text:x.content}]}));
-    const r=await safeFetch(p.base+"/models/"+encodeURIComponent(m)+":generateContent",{
-      method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
-      body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents,generationConfig:{temperature:0.8,maxOutputTokens:3000}})});
-    if(!r.ok){ const raw=await r.text(); const er=new Error(explain(r.status,raw)); er.status=r.status; throw er; }
-    const j=await r.json(); const c=j.candidates&&j.candidates[0];
-    return (c&&c.content&&c.content.parts||[]).map(x=>x.text||"").join("");
+    for(let attempt=0;attempt<2;attempt++){
+      const m=await geminiModel(key);
+      const r=await safeFetch(p.base+"/models/"+encodeURIComponent(m)+":generateContent",{
+        method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
+        body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents,generationConfig:{temperature:0.8,maxOutputTokens:3000}})});
+      if(r.ok){ const j=await r.json(); const c=j.candidates&&j.candidates[0]; return (c&&c.content&&c.content.parts||[]).map(x=>x.text||"").join(""); }
+      const raw=await r.text();
+      if(r.status===404 && attempt===0){ delete models.gemini; continue; }   /* purana model naam — dobara chuno */
+      const er=new Error(explain(r.status,raw)); er.status=r.status; throw er;
+    }
   }
-  const r=await safeFetch(p.base+"/chat/completions",{
-    method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
-    body:JSON.stringify({model:models[p.id]||p.model,temperature:0.8,max_tokens:3000,
-      messages:[{role:"system",content:SYSTEM},...messages]})});
-  if(!r.ok){ const raw=await r.text(); const er=new Error(explain(r.status,raw)); er.status=r.status; throw er; }
-  const j=await r.json();
-  return (j.choices&&j.choices[0]&&j.choices[0].message.content)||"";
+  const base=String(p.base).replace(/\/+$/,"");
+  let model=models[p.id]||p.model; const flags={}; let healed=false;
+  for(let attempt=0;attempt<4;attempt++){
+    const body={model,messages:[{role:"system",content:SYSTEM},...messages]};
+    if(!flags.noTemp) body.temperature=0.8;
+    if(flags.newTok) body.max_completion_tokens=3000; else body.max_tokens=3000;
+    const r=await safeFetch(base+"/chat/completions",{method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},body:JSON.stringify(body)});
+    if(r.ok) return chatText(await r.json());
+    const raw=await r.text(); const t=raw.toLowerCase();
+    if(r.status===400 && !flags.newTok && t.includes("max_completion_tokens")){ flags.newTok=true; continue; }
+    if(r.status===400 && !flags.noTemp && t.includes("temperature")){ flags.noTemp=true; continue; }
+    if(!healed && (r.status===404 || (r.status===400 && t.includes("model")))){
+      healed=true;
+      try{ model=await pickOpenAIModel(p); models[p.id]=model; save(); continue; }catch(e){ /* neeche asli error jayega */ }
+    }
+    const er=new Error(explain(r.status,raw)); er.status=r.status; throw er;
+  }
+  throw new Error("request baar baar reject hui — model/format dekho");
 }
 
-async function ask(messages){
-  const chosen=selEl.value;
-  const list=chosen?PROVIDERS.filter(p=>p.id===chosen&&keys[p.id]):PROVIDERS.filter(p=>keys[p.id]);
+async function ask(messages, opts){
+  opts=opts||{};
+  const chosen = opts.only!==undefined ? opts.only : selEl.value;
+  const have=allProviders().filter(p=>keys[p.id]);
+  let list = chosen ? have.filter(p=>p.id===chosen) : have;
   if(!list.length) throw new Error("koi key nahi hai — upar MODELS & KEYS me ek key daalo.");
-  let last=null;
+  const rank=p=>health[p.id]==="ok"?0:(health[p.id]===undefined?1:2);
+  list=list.map((p,i)=>({p,i})).sort((a,b)=>rank(a.p)-rank(b.p)||a.i-b.i).map(x=>x.p);
+  const fails=[];
   for(const p of list){
     try{
       const txt=await callProvider(p,messages);
       if(!String(txt).trim()) throw new Error("jawab khaali");
-      health[p.id]="ok"; save(); paint();
+      health[p.id]="ok"; delete errs[p.id]; save(); paint();
       return {txt, by:p.name};
-    }catch(e){ health[p.id]="bad"; save(); paint(); last=e; }
+    }catch(e){
+      health[p.id]=e.cors?"cors":"bad"; errs[p.id]=String(e.message).slice(0,160);
+      fails.push(p.name+": "+errs[p.id]); save(); paint();
+    }
   }
-  throw new Error("saare model fail — "+(last?last.message:"?"));
+  throw new Error("saare model fail —\n"+fails.join("\n"));
+}
+
+/* ---------- agent: tools + loop ---------- */
+const MAX_STEPS=6;
+const outputs=[];
+function readNotes(){ try{ const n=JSON.parse(localStorage.getItem("vinod-notes")||"[]"); return Array.isArray(n)?n:[]; }catch(e){ return []; } }
+
+function lintText(text,label){
+  if(/\.json(\?|$)/i.test(label)){ try{ JSON.parse(text); return "ok: JSON sahi hai"; }catch(e){ return "SYNTAX ERROR: "+e.message; } }
+  const re=/<script([^>]*)>([\s\S]*?)<\/script>/gi; let m,n=0; const errs2=[];
+  while((m=re.exec(text))){
+    const at=m[1];
+    if(/\bsrc\s*=/i.test(at) || /type\s*=\s*["']?(module|application\/(ld\+)?json|importmap)/i.test(at)) continue;
+    n++;
+    try{ new Function(m[2]); }catch(e){ errs2.push("script#"+n+": "+e.message); }
+  }
+  if(!n) return "koi inline script nahi — syntax check lagu nahi";
+  return errs2.length ? ("SYNTAX ERROR: "+errs2.join(" | ")) : ("ok: "+n+" script block, syntax theek (sirf syntax — behaviour test nahi)");
+}
+
+async function fetchSame(u){
+  let url; try{ url=new URL(String(u||""), location.href); }catch(e){ throw new Error("url galat"); }
+  const own = url.origin===new URL(location.href).origin;
+  if(!own && !ALLOW.includes(url.hostname)) throw new Error("yeh site allowlist me nahi hai: "+url.hostname+" (allowed: "+ALLOW.join(", ")+" + apni site)");
+  if(!own && url.protocol!=="https:") throw new Error("sirf https allowed");
+  const r=await safeFetch(url.href+(own?((url.search?"&":"?")+"v="+Date.now()):""),{cache:"no-store"},1);
+  if(!r.ok) throw new Error("HTTP "+r.status+" — "+url.href);
+  return {text:await r.text(), url:url.href};
+}
+
+const TOOLIMPL={
+  time_now: async()=>new Date().toString(),
+  calc: async a=>{
+    const ex=String(a.expr==null?"":a.expr).trim();
+    if(!ex||ex.length>200) throw new Error("expr khaali ya bahut lamba");
+    if(!/^[0-9+\-*\/().,%\s^a-zA-Z_]+$/.test(ex)) throw new Error("expr me galat akshar");
+    if(/\.[a-zA-Z_]/.test(ex)) throw new Error("'.' ke baad naam allowed nahi");
+    const names=Object.getOwnPropertyNames(Math);
+    (ex.match(/[a-zA-Z_][a-zA-Z_0-9]*/g)||[]).forEach(id=>{ if(!names.includes(id)) throw new Error("sirf Math ke naam allowed: "+id); });
+    const v=Function('"use strict";const {'+names.join(",")+'}=Math;return ('+ex.replace(/\^/g,"**")+');')();
+    if(typeof v!=="number"||!isFinite(v)) throw new Error("jawab number nahi: "+String(v));
+    return String(v);
+  },
+  fetch_text: async a=>{
+    const {text,url}=await fetchSame(a.url);
+    const body=text.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,"").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
+    return url+" ("+text.length+" chars)\n"+body.slice(0,3500);
+  },
+  system_check: async()=>{
+    const {rows,weak,gh}=await runSystemCheck();
+    return rows.map(r=>(r.ok?"OK ":"FAIL ")+r.name+" "+r.url+" "+(r.ok?(r.size+" chars "+r.ms+"ms"):r.note)).join("\n")
+      +"\nGitHub: "+(gh.lastCommit||"?")+" | "+(gh.runs.join(" ; ")||"?")
+      +"\nKAMZOR: "+(weak.join(" | ")||"koi nahi");
+  },
+  lint_app: async a=>{ const {text,url}=await fetchSame(a.url); return url+" → "+lintText(text,url); },
+  make_app: async a=>{
+    const name=String(a.name||"").trim(); const html=String(a.html||"");
+    if(!/^[A-Za-z0-9_.-]{1,60}$/.test(name)) throw new Error("file ka naam galat (sirf letters/numbers/._-)");
+    if(html.length<20) throw new Error("html khaali hai");
+    const lint=lintText(html,name);
+    outputs.push({name,html,lint});
+    return "file taiyar: "+name+" ("+html.length+" chars) — "+lint;
+  },
+  notes_list: async()=>{ const n=readNotes(); return n.length?n.map((x,i)=>(i+1)+". "+x).join("\n"):"koi note nahi"; },
+  note_add: async a=>{
+    const t=String(a.text||"").trim(); if(!t) throw new Error("text khaali");
+    const n=readNotes(); n.push(t.slice(0,500));
+    try{ localStorage.setItem("vinod-notes",JSON.stringify(n)); }catch(e){ throw new Error("note save nahi hua"); }
+    return "note save ho gaya ("+n.length+" total)";
+  }
+};
+
+async function callTool(name,args){
+  const f=Object.prototype.hasOwnProperty.call(TOOLIMPL,name)?TOOLIMPL[name]:null;
+  if(!f) return {ok:false,res:"tool nahi hai: "+name+" (tools: "+Object.keys(TOOLIMPL).join(", ")+")"};
+  try{ const r=await f(args&&typeof args==="object"?args:{}); return {ok:true,res:String(r).slice(0,3500)}; }
+  catch(e){ return {ok:false,res:"ERROR: "+e.message}; }
+}
+
+function parseToolCall(txt){
+  txt=String(txt||"");
+  const cands=[];
+  const fence=/```[a-zA-Z]*\s*([\s\S]*?)```/g; let fm;
+  while((fm=fence.exec(txt))) cands.push(fm[1]);
+  const mm=txt.match(/\{\s*"tool"/); if(mm) cands.push(txt.slice(mm.index));
+  for(const c of cands){
+    const start=c.indexOf("{"); if(start<0) continue;
+    let depth=0, inStr=false, esc=false;
+    for(let i=start;i<c.length;i++){
+      const ch=c[i];
+      if(inStr){ if(esc) esc=false; else if(ch==="\\") esc=true; else if(ch==='"') inStr=false; continue; }
+      if(ch==='"') inStr=true;
+      else if(ch==="{") depth++;
+      else if(ch==="}"){
+        depth--;
+        if(depth===0){ try{ const o=JSON.parse(c.slice(start,i+1)); if(o&&typeof o.tool==="string") return o; }catch(e){} break; }
+      }
+    }
+  }
+  return null;
+}
+
+function agentPrompt(){
+  return "Tumhare paas yeh tools hain. Tool chalane ke liye SIRF ek JSON object likho, aur kuch nahi, is format me:\n"
+    +'{"tool":"naam","args":{...}}\n\nTools:\n'+TOOLS.map(t=>"- "+t[0]+" "+t[1]+" — "+t[2]).join("\n")
+    +"\n\nRules:\n1. Ek baar me ek hi tool.\n2. Tool ka result TOOL_RESULT me aayega; uske baad agla tool ya FINAL jawab.\n"
+    +"3. FINAL jawab bina JSON ke Hinglish me do: kya chala, kya fail hua, kya fix kiya.\n"
+    +"4. Jo tool ne nahi chalaya use 'test hua' mat likho. lint_app sirf syntax dekhta hai, behaviour nahi.\n"
+    +"5. Max "+MAX_STEPS+" steps.";
+}
+
+async function runAgent(task, onStep){
+  const trace=[]; let by="";
+  const msgs=[{role:"user",content:agentPrompt()+"\n\nKAAM:\n"+task}];
+  for(let step=1; step<=MAX_STEPS; step++){
+    const a=await ask(msgs); by=a.by;
+    const call=parseToolCall(a.txt);
+    if(!call) return {final:a.txt, by, trace};
+    const args=(call.args&&typeof call.args==="object")?call.args:{};
+    const out=await callTool(call.tool,args);
+    trace.push({tool:call.tool,ok:out.ok,res:out.res});
+    if(onStep) onStep(step,{tool:call.tool,args},out.res);
+    msgs.push({role:"assistant",content:a.txt});
+    msgs.push({role:"user",content:"TOOL_RESULT ("+call.tool+"):\n"+out.res+"\n\nAb agla tool chalao ya FINAL jawab do (bina JSON ke)."});
+  }
+  msgs.push({role:"user",content:"Steps khatam. Ab tak ke TOOL_RESULT par FINAL jawab do — koi tool nahi."});
+  const a=await ask(msgs);
+  return {final:a.txt, by:a.by, trace};
+}
+
+function addDownload(o){
+  try{
+    const blob=new Blob([o.html],{type:"text/html"}); const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download=o.name;
+    a.textContent="⬇ "+o.name+" download karo ("+o.html.length+" chars) · "+o.lint;
+    a.className="b a"; a.style.display="block"; a.style.color="var(--green)";
+    outEl.appendChild(a);
+  }catch(e){}
 }
 
 function bub(cls,txt){ const d=document.createElement("div"); d.className="b "+cls; d.textContent=txt; outEl.appendChild(d); return d; }
@@ -336,8 +549,17 @@ document.getElementById("run").onclick=async()=>{
              : mode==="research" ? "\nResearch karke 5-7 bullet me summary do, source ke naam ke saath."
              : "\nPlan/steps me todo, phir output do.";
   try{
-    const {txt, by} = await ask([{role:"user",content:task+extra}]);
+    let txt, by, trace=[];
+    if(mode==="agent"||mode==="sysfix"){
+      outputs.length=0;
+      const hint = mode==="sysfix" ? "\n\nSYSTEM-FIX: pehle system_check chalao, phir har app par lint_app chalao. Jo fail ho uski wajah batao aur fix ko make_app se file me banao." : "";
+      const r=await runAgent(task+hint,(step,call,res)=>bub("t","STEP "+step+" · "+call.tool+" "+JSON.stringify(call.args||{}).slice(0,100)+"\n→ "+String(res).slice(0,220)));
+      txt=r.final; by=r.by; trace=r.trace;
+    }else{
+      const r=await ask([{role:"user",content:task+extra}]); txt=r.txt; by=r.by;
+    }
     bub("a", txt);
+    outputs.forEach(addDownload);
     show("ok","Jawab aaya — "+by);
     const codeMatch = txt.match(/```[a-zA-Z]*\n([\s\S]*?)```/);
     lastCard = [
@@ -346,8 +568,8 @@ document.getElementById("run").onclick=async()=>{
       "RESULT:",
       txt.trim(),
       codeMatch ? "\nCODE (alag kiya hua):\n"+codeMatch[1].trim() : "",
-      "\nTESTED: kuch nahi (Vinod khud nahi chala sakta)",
-      "NAHI HUA: jaanch baaki — Seetal chalakar dekhegi"
+      "\nTESTED: "+(trace.length?("jo tools asli me chale:\n"+trace.map(t=>"• "+t.tool+" → "+(t.ok?"chala":"FAIL")+": "+String(t.res).slice(0,100)).join("\n")):"kuch nahi (is mode me koi tool nahi chala)"),
+      "NAHI HUA: asli behaviour test (chalakar dekhna) — Seetal karegi"
     ].join("\n");
     const box=document.createElement("div"); box.className="card-out"; box.textContent=lastCard;
     outEl.appendChild(box);
@@ -409,7 +631,7 @@ const SYS=[
 async function deepInfo(name,url){
   const out={title:"",version:"",lines:0};
   try{
-    const r=await fetch(url+"?v="+Date.now(),{cache:"no-store"});
+    const r=await safeFetch(url+"?v="+Date.now(),{cache:"no-store"},1);
     const t=await r.text();
     const m=t.match(/<title>([^<]{0,90})/i); if(m) out.title=m[1].trim();
     const v=t.match(/\bV(\d{1,2})\b/); if(v) out.version="v"+v[1];
@@ -420,11 +642,11 @@ async function deepInfo(name,url){
 async function githubInfo(){
   const info={lastCommit:"",lastRun:"",runs:[]};
   try{
-    const r=await fetch("https://api.github.com/repos/bhupendarsingh785/swag-page/commits?per_page=1");
+    const r=await safeFetch("https://api.github.com/repos/bhupendarsingh785/swag-page/commits?per_page=1",{},1);
     if(r.ok){ const j=await r.json(); if(j[0]) info.lastCommit=(j[0].commit.message||"").slice(0,60)+" · "+j[0].commit.author.date.slice(0,16); }
   }catch(e){}
   try{
-    const r=await fetch("https://api.github.com/repos/bhupendarsingh785/swag-page/actions/runs?per_page=3");
+    const r=await safeFetch("https://api.github.com/repos/bhupendarsingh785/swag-page/actions/runs?per_page=3",{},1);
     if(r.ok){ const j=await r.json(); info.runs=(j.workflow_runs||[]).map(x=>x.name+" → "+(x.conclusion||x.status));
       info.lastRun=info.runs[0]||""; }
   }catch(e){}
@@ -439,21 +661,17 @@ async function aiAdvice(report){
   }catch(e){ return {txt:"(AI salah nahi mili: "+e.message+")",by:"-"}; }
 }
 
-document.getElementById("check").onclick=async()=>{
-  harvest();
-  const btn=document.getElementById("check"); btn.disabled=true; btn.textContent="Check ho raha hai…";
-  const box=document.getElementById("sysout"); box.innerHTML="";
-  const sm=document.getElementById("sysmsg"); sm.className="msg info show"; sm.textContent="Har system ko chhua ja raha hai…";
+async function runSystemCheck(){
   const rows=[], weak=[];
   for(const [name,url] of SYS){
     const t0=performance.now();
     let ok=false, size=0, note="";
     try{
-      const r=await fetch(url+"?v="+Date.now(),{cache:"no-store"});
+      const r=await safeFetch(url+"?v="+Date.now(),{cache:"no-store"},1);
       size=(await r.text()).length;
       ok=r.ok;
       if(!r.ok) note="HTTP "+r.status;
-    }catch(e){ note=e.message.slice(0,40); }
+    }catch(e){ note=String(e.message).slice(0,40); }
     const ms=Math.round(performance.now()-t0);
     const deep=ok?await deepInfo(name,url):{};
     rows.push({name,url,ok,size,ms,note,...deep});
@@ -462,11 +680,20 @@ document.getElementById("check").onclick=async()=>{
     else if(size<400) weak.push(name+" — khaali/short ("+size+" chars)");
   }
   const gh=await githubInfo();
-  box.innerHTML=rows.map(r=>`<div class="b ${r.ok?"a":"t"}">${r.ok?"✓":"✗"} <b>${esc(r.name)}</b> — ${r.ok?(esc(r.version||"")+" "+(r.title?esc(r.title.slice(0,42))+" · ":"")+r.size+" chars, "+r.ms+"ms"+(r.lines?" · "+r.lines+" lines":"")):"FAIL: "+esc(r.note)}</div>`).join("")
-    + `<div class="b t">GitHub: last commit — ${esc(gh.lastCommit||"?")}\nRuns: ${esc(gh.runs.join(" | ")||"?")}</div>`;
   const keysN=Object.keys(keys).filter(k=>keys[k]).length;
   if(keysN===0) weak.push("koi API key nahi — Vinod kaam nahi kar payega");
   if(!rows.find(r=>r.name==="Voices manifest"&&r.ok)) weak.push("natural awaaz ka manifest nahi mila — film ki awaaz robotic rahegi");
+  return {rows,weak,gh};
+}
+
+document.getElementById("check").onclick=async()=>{
+  harvest();
+  const btn=document.getElementById("check"); btn.disabled=true; btn.textContent="Check ho raha hai…";
+  const box=document.getElementById("sysout"); box.innerHTML="";
+  const sm=document.getElementById("sysmsg"); sm.className="msg info show"; sm.textContent="Har system ko chhua ja raha hai…";
+  const {rows,weak,gh}=await runSystemCheck();
+  box.innerHTML=rows.map(r=>`<div class="b ${r.ok?"a":"t"}">${r.ok?"✓":"✗"} <b>${esc(r.name)}</b> — ${r.ok?(esc(r.version||"")+" "+(r.title?esc(r.title.slice(0,42))+" · ":"")+r.size+" chars, "+r.ms+"ms"+(r.lines?" · "+r.lines+" lines":"")):"FAIL: "+esc(r.note)}</div>`).join("")
+    + `<div class="b t">GitHub: last commit — ${esc(gh.lastCommit||"?")}\nRuns: ${esc(gh.runs.join(" | ")||"?")}</div>`;
   sm.className="msg show "+(weak.length?"bad":"ok");
   sm.textContent = weak.length ? ("Kamzor hisse ("+weak.length+"):\n• "+weak.join("\n• ")) : "Sab theek — koi kamzor hissa nahi mila.";
   try{ localStorage.setItem("vinod-last-check", JSON.stringify({at:new Date().toISOString(),rows,weak,gh})); }catch(e){}
@@ -554,7 +781,7 @@ async function testOne(id){
   }catch(e){
     const ms=Math.round(performance.now()-t0);
     const isCors=e.cors||/CORS|Failed to fetch/i.test(String(e.message));
-    health[p.id]=isCors?"cors":"bad"; save(); paint();
+    health[p.id]=isCors?"cors":"bad"; errs[p.id]=String(e.message).slice(0,160); save(); paint();
     el.className="msg show bad"; el.textContent=(isCors?"⚠ ":"✗ ")+p.name+" — "+String(e.message).slice(0,120);
     diagRow(p,url,model,e.status||(isCors?0:null),String(e.message).slice(0,160),ms);
   }
@@ -579,7 +806,7 @@ document.getElementById("testKeys").onclick=async()=>{
               models[p.id]||p.model, 200, "jawab: "+String(txt).slice(0,30), ms);
     }catch(e){
       const isCors = e.cors || /CORS|Failed to fetch/i.test(String(e.message));
-      health[p.id] = isCors ? "cors" : "bad"; save(); paint();
+      health[p.id] = isCors ? "cors" : "bad"; errs[p.id]=String(e.message).slice(0,160); save(); paint();
       lines.push((isCors?"⚠ ":"✗ ")+p.name+" — "+String(e.message).slice(0,110));
       diagRow(p, p.kind==="gemini" ? (p.base+"/models/"+(models.gemini||"auto")+":generateContent") : (p.base+"/chat/completions"),
               models[p.id]||p.model, e.status||(isCors?0:null), String(e.message).slice(0,140), Math.round(performance.now()-t0));
@@ -626,6 +853,10 @@ document.getElementById("copyCard").onclick=async()=>{
   catch(e){ prompt("Copy karo:", lastCard); }
 };
 
+if(typeof window!=="undefined"){
+  window.addEventListener("error",ev=>{ try{ show("bad","Page error: "+(ev.message||"?")); }catch(e){} });
+  window.addEventListener("unhandledrejection",ev=>{ try{ show("bad","Error: "+((ev.reason&&ev.reason.message)||ev.reason)); }catch(e){} });
+}
 /* startup par hi counter dikhao */
 paintSaved();
 </script>
