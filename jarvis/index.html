@@ -91,6 +91,39 @@ const MEM_KEY="jarvis-memory-v1";
 let memory=[]; try{ memory=JSON.parse(localStorage.getItem(MEM_KEY)||"[]"); }catch(e){}
 const saveMem=()=>{ try{ localStorage.setItem(MEM_KEY, JSON.stringify(memory.slice(-200))); }catch(e){} };
 
+/* ---------- cloud storage (Supabase) — device badlo, yaaddasht wahi ---------- */
+const SB_URL="https://urvhrcyuqepzpbklonrz.supabase.co";
+const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVydmhyY3l1cWVwenBia2xvbnJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQxOTk3NTMsImV4cCI6MjEwOTc3NTc1M30.suk8CNaPdijU6rQy295NBxzQvo2Evc2aSm3rG4LKEgk";
+let cloudOn=true;
+
+async function cloudRemember(text){
+  if(!cloudOn) return false;
+  try{
+    const r=await fetch(SB_URL+"/rest/v1/jarvis_memory",{method:"POST",
+      headers:{apikey:SB_KEY,Authorization:"Bearer "+SB_KEY,"Content-Type":"application/json",Prefer:"return=minimal"},
+      body:JSON.stringify({text, vec:vec(text).map(x=>x.toFixed(3)).join(","), device:"web"})});
+    return r.ok;
+  }catch(e){ return false; }
+}
+async function cloudFetch(){
+  try{
+    const r=await fetch(SB_URL+"/rest/v1/jarvis_memory?select=text,vec,created_at&order=created_at.desc&limit=200",
+      {headers:{apikey:SB_KEY,Authorization:"Bearer "+SB_KEY}});
+    if(!r.ok) return 0;
+    const rows=await r.json();
+    if(!Array.isArray(rows)) return 0;
+    const seen=new Set(memory.map(m=>m.t));
+    let added=0;
+    rows.forEach(x=>{
+      if(!x.text || seen.has(x.text)) return;
+      memory.push({t:x.text, v:x.vec?x.vec.split(",").map(Number):vec(x.text), ts:Date.parse(x.created_at)||Date.now()});
+      added++;
+    });
+    if(added) saveMem();
+    return added;
+  }catch(e){ return 0; }
+}
+
 /* ---------- module sleep/wake ---------- */
 const modules={wake:true,stt:false,llm:false,tts:false};
 const timers={};
@@ -143,7 +176,10 @@ function vec(t){
   return v.map(x=>x/n);
 }
 const cos=(a,b)=>a.reduce((s,x,i)=>s+x*b[i],0);
-function remember(text){ memory.push({t:text, v:vec(text), ts:Date.now()}); saveMem(); }
+function remember(text){
+  memory.push({t:text, v:vec(text), ts:Date.now()}); saveMem();
+  cloudRemember(text).then(ok=>{ if(ok) bub("sys","cloud me bhi save ho gaya ✓"); });
+}
 function recall(q, k=3){
   const qv=vec(q);
   return memory.map(m=>({s:cos(qv,m.v||vec(m.t)), t:m.t})).sort((a,b)=>b.s-a.s).filter(x=>x.s>0.15).slice(0,k).map(x=>x.t);
@@ -151,11 +187,12 @@ function recall(q, k=3){
 
 /* ---------- router ---------- */
 const INTENTS=[
+  /* yaad rakhna pehle — warna "6 baje" jaisa time pakad leta hai */
+  ["remember", /\b(yaad rakho|yaad rakhna|remember karo|note karo)\b/],
+  ["memory", /\b(yaad hai|pehle kya|mujhe kya|bhool)\b/],
   ["time", /\b(samay|time|baje|kya baja)\b/],
   ["date", /\b(aaj|date|tarikh|konsi tarikh)\b/],
   ["math", /^[\d\s+\-*/().]+$|\b(plus|minus|into|divided|kitna hota)\b/],
-  ["remember", /\b(yaad rakho|remember karo|note karo)\b/],
-  ["memory", /\b(yaad hai|pehle kya|mujhe kya|bhool)\b/],
   ["code", /\b(code|script|function|bug|error|program)\b/]
 ];
 function route(t){
@@ -236,6 +273,7 @@ async function handle(raw){
   bub("a", ans);
   say(ans);
   setState("so raha hoon — \"jarvis\" bolo ya mic dabao","");
+cloudFetch().then(n=>{ if(n) bub("sys", n+" yaaddasht cloud se aa gayi ✓"); });
   wakeModule("wake");
 }
 
@@ -249,7 +287,8 @@ function startMic(){
   rec.lang="hi-IN"; rec.continuous=true; rec.interimResults=true;
   rec.onstart=()=>{ listening=true; wakeModule("stt", 60000); setState("sun raha hoon…","awake"); $("mic").textContent="Sunna band karo"; };
   rec.onerror=(e)=>{ bub("sys","mic error: "+(e.error||"?")); };
-  rec.onend=()=>{ listening=false; $("mic").textContent="Mic se baat karo"; setState("so raha hoon — \"jarvis\" bolo ya mic dabao",""); };
+  rec.onend=()=>{ listening=false; $("mic").textContent="Mic se baat karo"; setState("so raha hoon — \"jarvis\" bolo ya mic dabao","");
+cloudFetch().then(n=>{ if(n) bub("sys", n+" yaaddasht cloud se aa gayi ✓"); }); };
   rec.onresult=(ev)=>{
     for(let i=ev.resultIndex;i<ev.results.length;i++){
       const txt=ev.results[i][0].transcript.trim();
@@ -274,6 +313,7 @@ $("prov").onchange=()=>{
   $("provHint").textContent = p ? (keys[p] ? "key mil gayi ✓ — jawab AI se aayega." : "is provider ki key nahi mili (Vinod me daalo).") : "bina AI: time, ganit, yaaddasht.";
 };
 setState("so raha hoon — \"jarvis\" bolo ya mic dabao","");
+cloudFetch().then(n=>{ if(n) bub("sys", n+" yaaddasht cloud se aa gayi ✓"); });
 </script>
 </body>
 </html>
