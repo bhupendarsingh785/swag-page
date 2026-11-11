@@ -34,11 +34,15 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git remote add gitlab "$URL" || git remote set-url gitlab "$URL"
           echo "mirror -> $REPO"
-          # pehle normal push (protected branch par force allowed nahi hota)
+          # 1) normal push
           if git push gitlab HEAD:refs/heads/main; then
             echo "ho gaya (main): $REPO"
+          # 2) force push (GitLab me "Allowed to force push" ON ho to chalega)
+          elif git push gitlab HEAD:refs/heads/main --force; then
+            echo "ho gaya (main, force): $REPO"
+          # 3) warna alag branch par safe backup
           else
             echo "main par push nahi hua — mirror branch par bhej raha hoon"
-            git push gitlab HEAD:refs/heads/mirror
+            git push gitlab HEAD:refs/heads/mirror --force
             echo "ho gaya (mirror branch): $REPO"
           fi
