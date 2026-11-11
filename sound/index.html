@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Seetal Sound Lab — Freesound + Pixabay</title>
-<link href="https://fonts.googleapis.com/css2" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0b0e12;--card:#151a20;--card2:#1d242c;--line:#28313a;--text:#e8eef5;--dim:#8ea0b3;--green:#4caf50;--red:#e57373;--blue:#64b5f6}
 *{box-sizing:border-box}
@@ -42,6 +42,8 @@ a{color:var(--blue)}
     <label>Keys (ek baar — isi browser me save)</label>
     <div class="row"><span class="nm">Freesound</span><input id="fsKey" type="password" placeholder="Freesound API key"></div>
     <div class="row"><span class="nm">Pixabay</span><input id="pxKey" type="password" placeholder="Pixabay API key"></div>
+    <button id="testKeys" style="width:100%;margin-bottom:8px;background:var(--green);color:#06170a">keys test karo</button>
+    <div class="msg" id="tmsg"></div>
     <div class="msg info show">Key kahan se: <a href="https://freesound.org/apiv2/apply/" target="_blank">freesound.org/apiv2/apply</a> · <a href="https://pixabay.com/api/docs/" target="_blank">pixabay.com/api/docs</a></div>
   </div>
 
@@ -78,7 +80,7 @@ $("pxKey").oninput=e=>{ store.pixabay=e.target.value.trim(); save(); };
 function say(cls,t){ const m=$("msg"); m.className="msg show "+cls; m.textContent=t; }
 
 async function searchFreesound(q,key){
-  const url="https://freesound.org/apiv2/search/text/"+encodeURIComponent(q)+
+  const url="https://freesound.org/apiv2/search/text/?query="+encodeURIComponent(q)+
     "&fields=id,name,previews,duration,username&page_size=8&token="+encodeURIComponent(key);
   const r=await fetch(url);
   if(!r.ok) throw new Error("Freesound HTTP "+r.status+(r.status===401?" — key galat hai":""));
@@ -89,13 +91,48 @@ async function searchFreesound(q,key){
   }));
 }
 async function searchPixabay(q,key){
-  const url="https://pixabay.com/api/"+encodeURIComponent(key)+"&q="+encodeURIComponent(q)+
+  const url="https://pixabay.com/api/?key="+encodeURIComponent(key)+"&q="+encodeURIComponent(q)+
     "&image_type=photo&per_page=8";
   const r=await fetch(url);
   if(!r.ok) throw new Error("Pixabay HTTP "+r.status+(r.status===400?" — key galat hai":""));
   const j=await r.json();
   return (j.hits||[]).map(x=>({title:x.tags||("image "+x.id), meta:(x.user||"")+" · "+x.imageWidth+"x"+x.imageHeight, audio:"", img:x.previewURL}));
 }
+
+async function testOne(name, url, keyLabel){
+  const t0=performance.now();
+  try{
+    const r=await fetch(url);
+    const ms=Math.round(performance.now()-t0);
+    let extra="";
+    if(r.status===200){
+      let n="";
+      try{ const j=await r.json(); n=(j.results||j.hits||[]).length; }catch(e){}
+      return {ok:true, txt:"✓ "+name+" — chalu ("+r.status+", "+ms+"ms)"+(n?" · "+n+" result":"")};
+    }
+    let body=""; try{ body=(await r.text()).slice(0,80); }catch(e){}
+    let why = r.status===401||r.status===400 ? "key galat ya adhoori"
+            : r.status===429 ? "limit/rate — thodi der baad"
+            : r.status===403 ? "permission nahi" : "HTTP "+r.status;
+    return {ok:false, txt:"✗ "+name+" — "+why+" ("+r.status+") "+body};
+  }catch(e){
+    return {ok:false, txt:"✗ "+name+" — browser ne rok diya (CORS/network): "+e.message.slice(0,60)};
+  }
+}
+
+$("testKeys").onclick=async()=>{
+  const t=$("tmsg"); const lines=[];
+  if(store.freesound){
+    const r=await testOne("Freesound","https://freesound.org/apiv2/search/text/?query=rain&page_size=1&fields=id&token="+encodeURIComponent(store.freesound));
+    lines.push(r.txt);
+  } else lines.push("— Freesound key nahi hai");
+  if(store.pixabay){
+    const r=await testOne("Pixabay","https://pixabay.com/api/?key="+encodeURIComponent(store.pixabay)+"&q=rain&per_page=3");
+    lines.push(r.txt);
+  } else lines.push("— Pixabay key nahi hai");
+  t.className="msg show "+(lines.every(l=>l.startsWith("✓"))?"ok":"bad");
+  t.textContent=lines.join("\n");
+};
 
 $("go").onclick=async()=>{
   const q=$("q").value.trim(), src=$("src").value;
