@@ -155,7 +155,8 @@ const PROVIDERS=[
   {id:"deepseek",  name:"DeepSeek",  kind:"openai", base:"https://api.deepseek.com/v1",      model:"deepseek-chat"},
   {id:"kimi",      name:"Kimi",      kind:"openai", base:"https://api.moonshot.ai/v1",       model:"kimi-k2-0905-preview"},
   {id:"openrouter",name:"OpenRouter",kind:"openai", base:"https://openrouter.ai/api/v1",     model:"meta-llama/llama-3.3-70b-instruct:free"},
-  {id:"gemini",    name:"Gemini",    kind:"gemini", base:"https://generativelanguage.googleapis.com/v1beta", model:""}
+  {id:"gemini",    name:"Gemini",    kind:"gemini", base:"https://generativelanguage.googleapis.com/v1beta", model:""},
+  {id:"sarvam",    name:"Sarvam",    kind:"sarvam", base:"https://api.sarvam.ai/v1", model:"sarvam-105b"}
 ];
 let custom=[];
 try{ custom=JSON.parse(localStorage.getItem("vinod-custom-providers")||"[]"); }catch(e){ custom=[]; }
@@ -359,6 +360,18 @@ function cleanModel(m){ return String(m||"").trim().replace(/^~+/,""); }
 
 async function callProvider(p, messages){
   const key=keys[p.id];
+  if(p.kind==="sarvam"){
+    const base=String(p.base).replace(/\/+$/,"");
+    const r=await safeFetch(base+"/chat/completions",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","api-subscription-key":key},
+      body:JSON.stringify({model:cleanModel(models[p.id]||p.model),temperature:0.8,max_tokens:3000,
+        messages:[{role:"system",content:SYSTEM},...messages]})});
+    if(!r.ok){ const raw=await r.text(); const er=new Error(explain(r.status,raw)); er.status=r.status; throw er; }
+    const j=await r.json();
+    return (j.choices&&j.choices[0]&&j.choices[0].message.content)||"";
+  }
+
   if(p.kind==="gemini"){
     const contents=messages.filter(x=>x.role!=="system").map(x=>({role:x.role==="assistant"?"model":"user",parts:[{text:x.content}]}));
     let lastErr=null;
