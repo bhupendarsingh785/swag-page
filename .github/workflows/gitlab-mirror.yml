@@ -1,0 +1,38 @@
+name: GitLab mirror (backup)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code lo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: GitLab par bhejo
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_REPO: ${{ vars.GITLAB_REPO }}
+        run: |
+          if [ -z "$GITLAB_TOKEN" ]; then
+            echo "GITLAB_TOKEN secret nahi mila — GitHub Settings > Secrets me daalo"; exit 1
+          fi
+          REPO="${GITLAB_REPO:-gitlab.com/Bhuprndar785/bhupendarsingh785.git}"
+          case "$REPO" in
+            http*) URL="$REPO" ;;
+            *) URL="https://oauth2:${GITLAB_TOKEN}@${REPO}" ;;
+          esac
+          git config user.name "seetal-mirror-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git remote add gitlab "$URL" || git remote set-url gitlab "$URL"
+          echo "mirror -> $REPO"
+          git push gitlab HEAD:refs/heads/main --force
+          echo "ho gaya: $REPO"
