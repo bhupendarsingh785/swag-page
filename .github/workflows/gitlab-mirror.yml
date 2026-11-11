@@ -53,8 +53,23 @@ jobs:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
           GITLAB_REPO_2: ${{ vars.GITLAB_REPO_2 }}
         run: |
-          REPO2="${GITLAB_REPO_2:-gitlab.com/Bhuprndar785/Seetal.git}"
-          URL2="https://oauth2:${GITLAB_TOKEN}@${REPO2}"
-          git remote add gitlab2 "$URL2" || git remote set-url gitlab2 "$URL2"
-          echo "mirror2 -> $REPO2"
-          git push gitlab2 HEAD:refs/heads/main --force && echo "ho gaya (2nd: main): $REPO2" || echo "2nd repo me push nahi hua: $REPO2"
+          if [ -n "$GITLAB_REPO_2" ]; then
+            CANDS="$GITLAB_REPO_2"
+          else
+            CANDS="gitlab.com/Bhuprndar785/seetal.git gitlab.com/Bhuprndar785/Seetal.git gitlab.com/bhupendarsingh/seetal.git gitlab.com/bhupendra-singh/seetal.git"
+          fi
+          for R in $CANDS; do
+            U="https://oauth2:${GITLAB_TOKEN}@${R}"
+            git remote remove g2 2>/dev/null || true
+            git remote add g2 "$U"
+            echo "try -> $R"
+            if git push g2 HEAD:refs/heads/main --force 2>&1 | tee /tmp/out.txt; then
+              if grep -qi "rejected\|error\|fatal\|Could not create" /tmp/out.txt; then
+                echo "nahi chala: $R"
+              else
+                echo "HO GAYA (seetal): $R"; break
+              fi
+            else
+              echo "nahi chala: $R"
+            fi
+          done
