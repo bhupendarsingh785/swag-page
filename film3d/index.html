@@ -906,6 +906,118 @@ document.getElementById("play").onclick=()=>playFilm(false);
 document.getElementById("rec").onclick=()=>playFilm(true);
 { const sb=document.getElementById("stopbtn"); if(sb) sb.onclick=()=>{ stopFlag=true; show(msg2,"info","Rok rahe hain…"); }; }
 if(init3D()){ buildScene("jungle"); spawn("boy",0,false,"idle"); renderFrame({text:"",say:"",cam:0},0.5,false,0); }
+
+/* ================= BUILTIN SMOOTH 3D MODELS (v11) =================
+   Asli rigged characters — Soldier / Xbot / Fox / CesiumMan (free, CORS ok).
+   Load ho jaye to inhe use karo, warna purana cartoon character (fallback).
+*/
+const BUILTIN_URLS={
+  boy:"https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Soldier.glb",
+  man:"https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Soldier.glb",
+  girl:"https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/CesiumMan/glTF-Binary/CesiumMan.glb",
+  robot:"https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Xbot.glb",
+  fox:"https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Fox/glTF-Binary/Fox.glb"
+};
+const builtinCache={};
+const smoothActors=[];
+let smoothLast=0;
+
+function loadBuiltins(){
+  return new Promise(resolve=>{
+    if(typeof THREE==="undefined"||typeof THREE.GLTFLoader!=="function"){ resolve(); return; }
+    const loader=new THREE.GLTFLoader();
+    const urls=[...new Set(Object.values(BUILTIN_URLS))];
+    let left=urls.length;
+    const done=()=>{ if(--left<=0) resolve(); };
+    urls.forEach(u=>{
+      loader.load(u, g=>{ builtinCache[u]={scene:g.scene, clips:(g.animations||[])}; done(); },
+        undefined, ()=>{ done(); });
+    });
+  });
+}
+
+function fitModel(root, targetH){
+  try{
+    root.updateMatrixWorld(true);
+    const box=new THREE.Box3().setFromObject(root);
+    const h=box.max.y-box.min.y;
+    if(h>0.01){
+      const k=targetH/h;
+      root.scale.setScalar(k);
+      root.updateMatrixWorld(true);
+      const b2=new THREE.Box3().setFromObject(root);
+      root.position.y=-b2.min.y;
+    }
+  }catch(e){}
+}
+
+function pickClip(clips, action){
+  if(!clips||!clips.length) return null;
+  const want = action==="run" ? [/run/i,/walk/i,/idle/i]
+             : action==="idle" ? [/idle/i,/survey/i,/walk/i]
+             : [/walk/i,/run/i,/idle/i];
+  for(const re of want){ const c=clips.find(x=>re.test(x.name||"")); if(c) return c; }
+  return clips[0];
+}
+
+function spawnSmooth(kind, x, faceLeft, action){
+  const url=BUILTIN_URLS[kind]||BUILTIN_URLS.boy;
+  const b=builtinCache[url];
+  if(!b) return null;
+  let root;
+  try{ root = THREE.SkeletonUtils && THREE.SkeletonUtils.clone ? THREE.SkeletonUtils.clone(b.scene) : b.scene.clone(true); }
+  catch(e){ return null; }
+  const targetH = (kind==="fox") ? 0.9 : (kind==="man" ? 1.95 : 1.85);
+  root.position.set(x,0,0);
+  const two=Math.abs(x)>0.01, yaw=two?0.55:0.8;
+  root.rotation.y=faceLeft?-yaw:yaw;
+  scene.add(root);
+  fitModel(root, targetH);
+
+  let mixer=null, act=null;
+  const clip=pickClip(b.clips, action);
+  if(clip){
+    mixer=new THREE.AnimationMixer(root);
+    act=mixer.clipAction(clip);
+    act.play();
+    act.setEffectiveWeight ? act.setEffectiveWeight(1) : null;
+  }
+  const p={root, x0:x, kind, dir:faceLeft?-1:1, two, action:ACTIONS.includes(action)?action:"walk",
+    phase:0, lastS:false, external:true, mixer, clipAction:act, smooth:true};
+  people.push(p);
+  smoothActors.push(p);
+  { const el=document.getElementById("stchar"); if(el){ el.textContent=people.length+" 3D character"; el.style.color="var(--green)"; } }
+  return p;
+}
+
+/* spawn ko replace: pehle asli model, warna purana */
+(function(){
+  const prevSpawn=spawn;
+  spawn=function(kind,x,faceLeft,action){
+    const sp=spawnSmooth(kind,x,faceLeft,action);
+    if(sp) return sp;
+    return prevSpawn(kind,x,faceLeft,action);
+  };
+  const prevRender=renderFrame;
+  renderFrame=function(shot,t,speaking,sec){
+    const dt = smoothLast ? Math.max(0, Math.min(0.12, sec-smoothLast)) : 0.016;
+    smoothLast=sec;
+    smoothActors.forEach(p=>{
+      if(!p.mixer) return;
+      if(p.clipAction) p.clipAction.paused=false;
+      p.mixer.update(dt);
+      const moving=(p.action==="walk"||p.action==="run");
+      p.root.position.x = p.x0 + (moving ? (t-0.5)*(p.two?0.9:1.7)*p.dir : 0);
+    });
+    prevRender(shot,t,speaking,sec);
+  };
+})();
+
+/* init ke baad models load karo */
+(function(){
+  const start=()=>{ loadBuiltins().then(()=>{ const el=document.getElementById("stchar"); if(el){ el.textContent="3D models ready"; el.style.color="var(--green)"; } }); };
+  if(document.readyState==="complete") setTimeout(start,300); else window.addEventListener("load",()=>setTimeout(start,300));
+})();
 </script>
 
 <style>
@@ -1159,6 +1271,8 @@ if(init3D()){ buildScene("jungle"); spawn("boy",0,false,"idle"); renderFrame({te
   // First-run preview and safety note.
   setTimeout(()=>refreshTimeline(),0);
 })();
+
+
 </script>
 
 </body>
