@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Seetal — poora system dashboard</title>
-<link href="https://fonts.googleapis.com/css2" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0b0e12;--card:#151a20;--card2:#1d242c;--line:#28313a;--text:#e8eef5;--dim:#8ea0b3;
  --green:#4caf50;--red:#e57373;--blue:#64b5f6;--amber:#e0a44a;--purple:#b39ddb}
@@ -48,6 +48,14 @@ button:hover{background:var(--line)}
   <div class="card">
     <h2>Apps — kholne ke liye tap karo</h2>
     <div class="grid" id="apps"></div>
+  </div>
+
+  <div class="card">
+    <h2>Backend — kaam bhejo (Supabase queue)</h2>
+    <textarea id="jobTask" placeholder="Kaam likho… (backend queue me jayega)" style="width:100%;min-height:70px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);padding:10px;font-family:inherit;font-size:14px"></textarea>
+    <button id="jobSend" style="background:var(--green);color:#06170a;margin-top:8px">Queue me bhejo</button>
+    <div id="jobMsg" style="font-size:12.5px;color:var(--dim);margin-top:6px"></div>
+    <div id="jobs" style="margin-top:8px"></div>
   </div>
 
   <div class="card">
@@ -117,6 +125,37 @@ const INTEG=[
   ["Gmail","auth baaki",false]
 ];
 
+const SB_URL="https://urvhrcyuqepzpbklonrz.supabase.co";
+const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVydmhyY3l1cWVwenBia2xvbnJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQxOTk3NTMsImV4cCI6MjEwOTc3NTc1M30.suk8CNaPdijU6rQy295NBxzQvo2Evc2aSm3rG4LKEgk";
+
+async function loadJobs(){
+  try{
+    const r=await fetch(SB_URL+"/rest/v1/vinod_jobs?select=id,task,status,result,provider,created_at&order=created_at.desc&limit=5",
+      {headers:{apikey:SB_KEY,Authorization:"Bearer "+SB_KEY}});
+    const j=await r.json();
+    const el=document.getElementById("jobs");
+    if(!Array.isArray(j)||!j.length){ el.innerHTML='<div class="row"><span class="nm dim">abhi koi job nahi</span></div>'; return; }
+    el.innerHTML=j.map(x=>`<div class="row"><span class="nm">${esc(String(x.task).slice(0,60))}<br><span class="dim" style="font-size:11px">${esc((x.result||"").slice(0,80)||"—")}</span></span><span class="pill ${x.status==="done"?"on":"off"}">${esc(x.status)}</span></div>`).join("");
+  }catch(e){ document.getElementById("jobs").innerHTML='<div class="row"><span class="nm bad">queue se baat nahi hui</span></div>'; }
+}
+
+document.getElementById("jobSend").onclick=async()=>{
+  const t=document.getElementById("jobTask").value.trim();
+  const m=document.getElementById("jobMsg");
+  if(!t){ m.textContent="Pehle kaam likho."; return; }
+  m.textContent="bheja ja raha hai…";
+  try{
+    const r=await fetch(SB_URL+"/rest/v1/vinod_jobs",{
+      method:"POST",
+      headers:{apikey:SB_KEY,Authorization:"Bearer "+SB_KEY,"Content-Type":"application/json",Prefer:"return=minimal"},
+      body:JSON.stringify({task:t,mode:"plan",source:"dashboard"})});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    m.textContent="Queue me chala gaya ✓ (worker uthayega)";
+    document.getElementById("jobTask").value="";
+    loadJobs();
+  }catch(e){ m.textContent="Nahi gaya: "+e.message; }
+};
+
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
@@ -142,7 +181,7 @@ async function check(){
   $("sub").textContent=okN+" / "+out.length+" systems chalu · "+new Date().toLocaleString("en-IN");
 
   try{
-    const r=await fetch("https://api.github.com/repos/bhupendarsingh785/swag-page/commits");
+    const r=await fetch("https://api.github.com/repos/bhupendarsingh785/swag-page/commits?per_page=1");
     const j=await r.json();
     const c=j[0];
     $("git").innerHTML=`<div class="row"><span class="nm">Last commit</span><span class="st dim">${esc((c.commit.message||"").slice(0,52))}</span></div>
@@ -155,6 +194,8 @@ async function check(){
 }
 $("recheck").onclick=check;
 check();
+loadJobs();
+setInterval(loadJobs, 30000);
 </script>
 </body>
 </html>
