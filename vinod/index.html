@@ -356,7 +356,36 @@ async function pickOpenAIModel(p){
   return ids.slice().sort((a,b)=>score(b)-score(a))[0];
 }
 
-function cleanModel(m){ return String(m||"").trim().replace(/^~+/,""); }
+const MODEL_OK={
+  sarvam:["sarvam-105b","sarvam-105b-conversations","glm5.3-flash","deepseekv4.1-flash-1017","qwen38-27b","gemma4"],
+  gemini:["gemini-3.5-flash","gemini-2.5-flash","gemini-flash-latest","gemini-2.0-flash"],
+  groq:["qwen/qwen3.8-27b","openai/gpt-oss-120b","openai/gpt-oss-20b","allam-2-7b"],
+  openrouter:["deepseek/deepseek-chat","openai/gpt-4o-mini","meta-llama/llama-3.3-70b-instruct:free"],
+  openai:["gpt-4o-mini","gpt-4o"],
+  deepseek:["deepseek-chat","deepseek-reasoner"],
+  kimi:["kimi-k2-0905-preview","moonshot-v1-8k"]
+};
+function cleanModel(m, p){
+  let v=String(m||"").trim().replace(/^~+/,"");
+  const nm=(p&&p.name)||"";
+  if(!v || /\s/.test(v) || (nm && v.toLowerCase()===nm.toLowerCase())) v=(p&&p.model)||"";
+  const list=p&&MODEL_OK[p.id];
+  if(list && v && !list.includes(v)) v=(p&&p.model)||list[0];
+  return v;
+}
+function fixModelStore(){
+  let changed=false;
+  try{
+    const prov=(typeof allProviders==="function")?allProviders():[];
+    Object.keys(models||{}).forEach(id=>{
+      const p=prov.find(x=>x.id===id);
+      const fixed=cleanModel(models[id],p);
+      if(fixed!==models[id]){ if(fixed) models[id]=fixed; else delete models[id]; changed=true; }
+      if(id==="gemini" && fixed) models.geminiAuto=true;
+    });
+  }catch(e){}
+  if(changed){ try{ save(); }catch(e){} }
+}
 
 async function callProvider(p, messages){
   const key=keys[p.id];
@@ -365,7 +394,7 @@ async function callProvider(p, messages){
     const r=await safeFetch(base+"/chat/completions",{
       method:"POST",
       headers:{"Content-Type":"application/json","api-subscription-key":key},
-      body:JSON.stringify({model:cleanModel(models[p.id]||p.model),temperature:0.8,max_tokens:3000,
+      body:JSON.stringify({model:cleanModel(models[p.id]||p.model, p),temperature:0.8,max_tokens:3000,
         messages:[{role:"system",content:SYSTEM},...messages]})});
     if(!r.ok){ const raw=await r.text(); const er=new Error(explain(r.status,raw)); er.status=r.status; throw er; }
     const j=await r.json();
@@ -376,7 +405,7 @@ async function callProvider(p, messages){
     const contents=messages.filter(x=>x.role!=="system").map(x=>({role:x.role==="assistant"?"model":"user",parts:[{text:x.content}]}));
     let lastErr=null;
     for(let attempt=0;attempt<3;attempt++){
-      const m=cleanModel(await geminiModel(key));
+      const m=cleanModel(await geminiModel(key), p);
       const auto=!!models.geminiAuto;
       let r;
       try{
@@ -396,7 +425,7 @@ async function callProvider(p, messages){
     throw lastErr||new Error("Gemini ke saare model fail");
   }
   const base=String(p.base).replace(/\/+$/,"");
-  let model=cleanModel(models[p.id]||p.model); const flags={}; let healed=false;
+  let model=cleanModel(models[p.id]||p.model, p); const flags={}; let healed=false;
   for(let attempt=0;attempt<4;attempt++){
     const body={model,messages:[{role:"system",content:SYSTEM},...messages]};
     if(!flags.noTemp) body.temperature=0.8;
@@ -971,6 +1000,7 @@ document.getElementById("expKeys").onclick=()=>{
   document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},3000);
   try{ localStorage.setItem("vinod-last-backup", new Date().toISOString().slice(0,10)); }catch(e){}
   paintSaved();
+try{ fixModelStore(); }catch(e){}
   show("ok","Backup file download ho gayi — sambhal ke rakho.");
 };
 document.getElementById("impKeys").onclick=()=>document.getElementById("impFile").click();
