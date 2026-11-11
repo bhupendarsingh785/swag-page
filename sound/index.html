@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seetal Sound Lab — Freesound + Pixabay</title>
+<link href="https://fonts.googleapis.com/css2" rel="stylesheet">
+<style>
+:root{--bg:#0b0e12;--card:#151a20;--card2:#1d242c;--line:#28313a;--text:#e8eef5;--dim:#8ea0b3;--green:#4caf50;--red:#e57373;--blue:#64b5f6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;font-size:15px}
+.wrap{max-width:760px;margin:0 auto;padding:16px 14px 70px}
+h1{font-size:21px;margin:0 0 3px;font-weight:800}
+.sub{color:var(--dim);font-size:13px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:12px}
+label{font-family:"Azeret Mono",monospace;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:5px}
+input,select{width:100%;padding:10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-family:inherit;font-size:14px}
+button{font-family:inherit;font-size:14px;font-weight:700;padding:11px 14px;border-radius:10px;border:none;background:var(--card2);color:var(--text);cursor:pointer}
+button.go{background:var(--green);color:#06170a;width:100%;margin-top:9px}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.row .nm{font-family:"Azeret Mono",monospace;font-size:11px;width:76px;color:var(--dim)}
+.msg{padding:9px 11px;border-radius:9px;font-size:13px;margin-top:8px;display:none;white-space:pre-wrap}
+.msg.show{display:block}
+.msg.ok{background:#12241a;color:var(--green);border:1px solid var(--green)}
+.msg.bad{background:#2a1414;color:var(--red);border:1px solid var(--red)}
+.msg.info{background:var(--card2);color:var(--dim);border:1px dashed var(--line)}
+.res{display:flex;gap:9px;align-items:center;padding:9px 0;border-bottom:1px dashed rgba(255,255,255,.07)}
+.res:last-child{border-bottom:none}
+.res .t{flex:1;font-size:13.5px}
+.res .t small{display:block;color:var(--dim);font-size:11px}
+audio{height:34px;width:100%;margin-top:6px}
+.foot{color:var(--dim);font-size:12px;line-height:1.6;margin-top:12px}
+a{color:var(--blue)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Seetal Sound Lab</h1>
+  <div class="sub">Asli sound effects (Freesound) aur free music (Pixabay) — film ke liye.</div>
+
+  <div class="card">
+    <label>Keys (ek baar — isi browser me save)</label>
+    <div class="row"><span class="nm">Freesound</span><input id="fsKey" type="password" placeholder="Freesound API key"></div>
+    <div class="row"><span class="nm">Pixabay</span><input id="pxKey" type="password" placeholder="Pixabay API key"></div>
+    <div class="msg info show">Key kahan se: <a href="https://freesound.org/apiv2/apply/" target="_blank">freesound.org/apiv2/apply</a> · <a href="https://pixabay.com/api/docs/" target="_blank">pixabay.com/api/docs</a></div>
+  </div>
+
+  <div class="card">
+    <label>Kya dhundo</label>
+    <input id="q" placeholder="jaise: jungle birds, rain, footsteps, tabla">
+    <div class="row" style="margin-top:8px">
+      <select id="src"><option value="fs">Freesound (SFX)</option><option value="px">Pixabay (music)</option></select>
+      <button id="go" style="min-width:110px">Dhundo</button>
+    </div>
+    <div class="msg" id="msg"></div>
+    <div id="out" style="margin-top:8px"></div>
+  </div>
+
+  <div class="foot">
+    Yeh page sirf dhundo/preview/download karta hai. Keys tumhare browser me rehti hain, kahin bhejti nahi.
+  </div>
+</div>
+
+<script>
+const KS="seetal-keys-v1";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let store={};
+try{ store=JSON.parse(localStorage.getItem(KS)||"{}"); }catch(e){}
+const save=()=>{ try{ localStorage.setItem(KS, JSON.stringify(store)); }catch(e){} };
+$("fsKey").value=store.freesound||"";
+$("pxKey").value=store.pixabay||"";
+$("fsKey").onchange=e=>{ store.freesound=e.target.value.trim(); save(); };
+$("pxKey").onchange=e=>{ store.pixabay=e.target.value.trim(); save(); };
+$("fsKey").oninput=e=>{ store.freesound=e.target.value.trim(); save(); };
+$("pxKey").oninput=e=>{ store.pixabay=e.target.value.trim(); save(); };
+
+function say(cls,t){ const m=$("msg"); m.className="msg show "+cls; m.textContent=t; }
+
+async function searchFreesound(q,key){
+  const url="https://freesound.org/apiv2/search/text/"+encodeURIComponent(q)+
+    "&fields=id,name,previews,duration,username&page_size=8&token="+encodeURIComponent(key);
+  const r=await fetch(url);
+  if(!r.ok) throw new Error("Freesound HTTP "+r.status+(r.status===401?" — key galat hai":""));
+  const j=await r.json();
+  return (j.results||[]).map(x=>({
+    title:x.name, meta:(x.username||"")+" · "+Math.round(x.duration||0)+"s",
+    audio:(x.previews&&(x.previews["preview-hq-mp3"]||x.previews["preview-lq-mp3"]))||""
+  }));
+}
+async function searchPixabay(q,key){
+  const url="https://pixabay.com/api/"+encodeURIComponent(key)+"&q="+encodeURIComponent(q)+
+    "&image_type=photo&per_page=8";
+  const r=await fetch(url);
+  if(!r.ok) throw new Error("Pixabay HTTP "+r.status+(r.status===400?" — key galat hai":""));
+  const j=await r.json();
+  return (j.hits||[]).map(x=>({title:x.tags||("image "+x.id), meta:(x.user||"")+" · "+x.imageWidth+"x"+x.imageHeight, audio:"", img:x.previewURL}));
+}
+
+$("go").onclick=async()=>{
+  const q=$("q").value.trim(), src=$("src").value;
+  if(!q){ say("bad","Pehle kuch likho."); return; }
+  const key = src==="fs" ? store.freesound : store.pixabay;
+  if(!key){ say("bad",(src==="fs"?"Freesound":"Pixabay")+" ki key nahi hai — upar daalo."); return; }
+  say("info","Dhunda ja raha hai…");
+  try{
+    const list = src==="fs" ? await searchFreesound(q,key) : await searchPixabay(q,key);
+    if(!list.length){ say("bad","Kuch nahi mila — doosre shabd try karo."); $("out").innerHTML=""; return; }
+    say("ok",list.length+" result mile");
+    $("out").innerHTML=list.map((x,i)=>`<div class="res"><div class="t">${esc(x.title)}<small>${esc(x.meta)}</small>
+      ${x.audio?`<audio controls preload="none" src="${esc(x.audio)}"></audio>`:""}
+      ${x.img?`<img src="${esc(x.img)}" style="width:100%;border-radius:8px;margin-top:6px">`:""}
+      </div><a href="${esc(x.audio||x.img)}" target="_blank" download style="font-size:12px">kholo</a></div>`).join("");
+  }catch(e){ say("bad", e.message); }
+};
+</script>
+</body>
+</html>
