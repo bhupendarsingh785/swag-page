@@ -148,6 +148,15 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
 const KSTORE="seetal-keys-v1";
 const LEGACY="vinod-keys-v1";
 const MIRROR="seetal-keys-mirror-v1";
+const MODEL_OK={
+  sarvam:["sarvam-105b","sarvam-105b-conversations","glm5.3-flash","deepseekv4.1-flash-1017","qwen38-27b","gemma4"],
+  gemini:["gemini-3.5-flash","gemini-2.5-flash","gemini-flash-latest","gemini-2.0-flash"],
+  groq:["qwen/qwen3.8-27b","openai/gpt-oss-120b","openai/gpt-oss-20b","allam-2-7b"],
+  openrouter:["deepseek/deepseek-chat","openai/gpt-4o-mini","meta-llama/llama-3.3-70b-instruct:free"],
+  openai:["gpt-4o-mini","gpt-4o"],
+  deepseek:["deepseek-chat","deepseek-reasoner"],
+  kimi:["kimi-k2-0905-preview","moonshot-v1-8k"]
+};
 const BROWSER_OK={groq:true,openai:true,openrouter:true,gemini:true,deepseek:true,kimi:true};
 const PROVIDERS=[
   {id:"groq",      name:"Groq",      kind:"openai", base:"https://api.groq.com/openai/v1",   model:"qwen/qwen3.8-27b"},
@@ -356,15 +365,6 @@ async function pickOpenAIModel(p){
   return ids.slice().sort((a,b)=>score(b)-score(a))[0];
 }
 
-const MODEL_OK={
-  sarvam:["sarvam-105b","sarvam-105b-conversations","glm5.3-flash","deepseekv4.1-flash-1017","qwen38-27b","gemma4"],
-  gemini:["gemini-3.5-flash","gemini-2.5-flash","gemini-flash-latest","gemini-2.0-flash"],
-  groq:["qwen/qwen3.8-27b","openai/gpt-oss-120b","openai/gpt-oss-20b","allam-2-7b"],
-  openrouter:["deepseek/deepseek-chat","openai/gpt-4o-mini","meta-llama/llama-3.3-70b-instruct:free"],
-  openai:["gpt-4o-mini","gpt-4o"],
-  deepseek:["deepseek-chat","deepseek-reasoner"],
-  kimi:["kimi-k2-0905-preview","moonshot-v1-8k"]
-};
 function cleanModel(m, p){
   let v=String(m||"").trim().replace(/^~+/,"");
   const nm=(p&&p.name)||"";
@@ -373,31 +373,30 @@ function cleanModel(m, p){
   if(list && v && !list.includes(v)) v=(p&&p.model)||list[0];
   return v;
 }
-function fixModelStore(){
-  let changed=false;
-  try{
-    const prov=(typeof allProviders==="function")?allProviders():[];
-    Object.keys(models||{}).forEach(id=>{
-      const p=prov.find(x=>x.id===id);
-      const fixed=cleanModel(models[id],p);
-      if(fixed!==models[id]){ if(fixed) models[id]=fixed; else delete models[id]; changed=true; }
-      if(id==="gemini" && fixed) models.geminiAuto=true;
-    });
-  }catch(e){}
-  if(changed){ try{ save(); }catch(e){} }
-}
 
 async function callProvider(p, messages){
   const key=keys[p.id];
   if(p.kind==="sarvam"){
     const base=String(p.base).replace(/\/+$/,"");
-    const r=await safeFetch(base+"/chat/completions",{
-      method:"POST",
-      headers:{"Content-Type":"application/json","api-subscription-key":key},
-      body:JSON.stringify({model:cleanModel(models[p.id]||p.model, p),temperature:0.8,max_tokens:3000,
-        messages:[{role:"system",content:SYSTEM},...messages]})});
-    if(!r.ok){ const raw=await r.text(); const er=new Error(explain(r.status,raw)); er.status=r.status; throw er; }
-    const j=await r.json();
+    const tryModel=async(mdl)=>{
+      const r=await safeFetch(base+"/chat/completions",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","api-subscription-key":key},
+        body:JSON.stringify({model:mdl,temperature:0.8,max_tokens:3000,
+          messages:[{role:"system",content:SYSTEM},...messages]})});
+      return r;
+    };
+    let r=await tryModel(cleanModel(models[p.id]||p.model,p));
+    if(!r.ok && (r.status===400||r.status===404)){
+      /* model galat nikla — default se ek baar aur */
+      for(const alt of MODEL_OK.sarvam){
+        const r2=await tryModel(alt);
+        if(r2.ok){ models[p.id]=alt; save(); r=r2; break; }
+      }
+    }
+    const r2=r;
+    if(!r2.ok){ const raw=await r2.text(); const er=new Error(explain(r2.status,raw)); er.status=r2.status; throw er; }
+    const j=await r2.json();
     return (j.choices&&j.choices[0]&&j.choices[0].message.content)||"";
   }
 
@@ -428,6 +427,9 @@ async function callProvider(p, messages){
   let model=cleanModel(models[p.id]||p.model, p); const flags={}; let healed=false;
   for(let attempt=0;attempt<4;attempt++){
     const body={model,messages:[{role:"system",content:SYSTEM},...messages]};
+    if(attempt===1 && (MODEL_OK[p.id]||[]).length && !(MODEL_OK[p.id]||[]).includes(model)){
+      model=(p.model||MODEL_OK[p.id][0]);   /* galat model -> default se dobara */
+    }
     if(!flags.noTemp) body.temperature=0.8;
     if(flags.newTok) body.max_completion_tokens=3000; else body.max_tokens=3000;
     const r=await safeFetch(base+"/chat/completions",{method:"POST",
@@ -928,6 +930,7 @@ ${detail?("detail: "+detail):""}`;
 async function testOne(id){
   harvest();
   const p=allProviders().find(x=>x.id===id); if(!p) return;
+  { const f=cleanModel(models[p.id]||p.model,p); if(f && f!==models[p.id]){ models[p.id]=f; save(); paint(); } }
   const el=document.getElementById("testMsg");
   el.className="msg show info"; el.textContent=p.name+" test ho raha hai…";
   const key=keys[p.id];
@@ -962,6 +965,8 @@ document.getElementById("testKeys").onclick=async()=>{
   for(const p of list){
     const t0=performance.now();
     try{
+      const fixedM=cleanModel(models[p.id]||p.model,p);
+      if(fixedM && fixedM!==models[p.id]){ models[p.id]=fixedM; save(); }
       const txt=await callProvider(p,[{role:"user",content:"Sirf ek shabd likho: OK"}]);
       const ms=Math.round(performance.now()-t0);
       const ok=String(txt).trim().length>0;
@@ -1000,7 +1005,6 @@ document.getElementById("expKeys").onclick=()=>{
   document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},3000);
   try{ localStorage.setItem("vinod-last-backup", new Date().toISOString().slice(0,10)); }catch(e){}
   paintSaved();
-try{ fixModelStore(); }catch(e){}
   show("ok","Backup file download ho gayi — sambhal ke rakho.");
 };
 document.getElementById("impKeys").onclick=()=>document.getElementById("impFile").click();
