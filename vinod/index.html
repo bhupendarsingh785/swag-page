@@ -106,6 +106,13 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
   </div>
 
   <div class="card">
+    <label>System audit (Vinod khud code dekhega — bina tumhe paste karne)</label>
+    <button id="audit" style="width:100%;background:var(--blue);color:#04101f">Poora system khud dekho aur bug dhoondo</button>
+    <div class="msg" id="auditMsg"></div>
+    <div id="auditOut"></div>
+  </div>
+
+  <div class="card">
     <label>System ki sehat (poora Seetal system)</label>
     <button id="check" style="width:100%">System check karo</button>
     <div class="msg" id="sysmsg"></div>
@@ -734,6 +741,73 @@ async function runSystemCheck(){
   if(!rows.find(r=>r.name==="Voices manifest"&&r.ok)) weak.push("natural awaaz ka manifest nahi mila — film ki awaaz robotic rahegi");
   return {rows,weak,gh};
 }
+
+/* ---------- system audit: khud code padho, bug dhoondo ---------- */
+const SYS_FILES=[
+  ["3D studio","../film3d/index.html"],
+  ["Film maker","../film/index.html"],
+  ["Agent (simple)","../agent-simple/live/index.html"],
+  ["Connector","../connector/index.html"],
+  ["Free hub","../free/index.html"],
+  ["Dev stack","../dev/index.html"],
+  ["Vinod (khud)","index.html"]
+];
+function stripSecrets(t){
+  return String(t)
+    .replace(/gsk_[A-Za-z0-9]{10,}/g,"[GROQ_KEY]")
+    .replace(/sk-[A-Za-z0-9_-]{10,}/g,"[OPENAI_KEY]")
+    .replace(/AIza[A-Za-z0-9_-]{10,}/g,"[GEMINI_KEY]")
+    .replace(/AQ\.[A-Za-z0-9_-]{10,}/g,"[GOOGLE_KEY]");
+}
+async function auditOne(name,url){
+  const out={name,url,ok:false,bytes:0,scripts:0,syntax:[],dupIds:[],missingIds:[],fetchCalls:0,storage:[],notes:[]};
+  try{
+    const r=await fetch(url+"?v="+Date.now(),{cache:"no-store"});
+    out.ok=r.ok;
+    const html=await r.text();
+    out.bytes=html.length;
+    const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
+    out.dupIds=[...new Set(ids.filter((x,i)=>ids.indexOf(x)!==i))];
+    const blocks=[...html.matchAll(/<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]);
+    out.scripts=blocks.length;
+    blocks.forEach((b,i)=>{ try{ new Function(b); }catch(e){ out.syntax.push("script#"+i+": "+e.message.slice(0,80)); } });
+    const js=blocks.join("\n");
+    const refs=[...js.matchAll(/getElementById\("([^"]+)"\)/g)].map(m=>m[1]);
+    out.missingIds=[...new Set(refs.filter(x=>!ids.includes(x)))];
+    out.fetchCalls=(js.match(/fetch\(/g)||[]).length;
+    out.storage=[...new Set([...js.matchAll(/localStorage\.(?:get|set|remove)Item\("([^"]+)"\)/g)].map(m=>m[1]))];
+    if(!out.ok) out.notes.push("page khulta nahi");
+    if(!blocks.length) out.notes.push("koi inline script nahi mila");
+  }catch(e){ out.notes.push("fetch fail: "+String(e.message).slice(0,60)); }
+  return out;
+}
+document.getElementById("audit").onclick=async()=>{
+  const btn=document.getElementById("audit"), am=document.getElementById("auditMsg"), ao=document.getElementById("auditOut");
+  btn.disabled=true; btn.textContent="Code padha ja raha hai…";
+  am.className="msg show info"; am.textContent="Har system ka code khud padh raha hoon…"; ao.innerHTML="";
+  const reports=[];
+  for(const [n,u] of SYS_FILES){ const r=await auditOne(n,u); reports.push(r);
+    const d=document.createElement("div"); d.className="b "+(r.ok?"a":"t");
+    d.textContent=`${r.ok?"✓":"✗"} ${r.name} — ${r.bytes} bytes · ${r.scripts} script · syntax issues: ${r.syntax.length} · missing ids: ${r.missingIds.length} · fetch: ${r.fetchCalls}`;
+    ao.appendChild(d);
+  }
+  const bad=reports.filter(r=>!r.ok||r.syntax.length||r.missingIds.length);
+  am.className="msg show "+(bad.length?"bad":"ok");
+  const badLines = bad.map(b=>b.name+" — "+[b.syntax.length+" syntax",b.missingIds.length+" missing id",b.ok?"":"page band"].filter(Boolean).join(", "));
+  am.textContent = bad.length ? ("Dikkat "+bad.length+" file me:\n• "+badLines.join("\n• ")) : "Static check me koi dikkat nahi mili.";
+  // ab AI se sudhaar poochho — code nahi, sirf report (secrets hata kar)
+  am.textContent += "\nAI se sudhaar poochh raha hoon…";
+  try{
+    const rep=stripSecrets(JSON.stringify(reports)).slice(0,4000);
+    const {txt,by}=await ask([{role:"user",content:
+      "Yeh mere web system ke files ka static audit hai (JSON):\n"+rep+
+      "\n\nTu senior engineer hai. Hinglish me: (1) sabse serious 3 bug/wajah, (2) har ek ka patch kaise karein (kaun si line/pattern), (3) kaun sa check abhi missing hai. Chhota aur seedha."}]);
+    const d=document.createElement("div"); d.className="b a"; d.innerHTML="<b>AI ki salah — "+esc(by)+"</b>\n"+esc(txt);
+    ao.appendChild(d);
+    am.className="msg show ok"; am.textContent="Audit poora — salah neeche.";
+  }catch(e){ am.className="msg show bad"; am.textContent="AI salah nahi mili: "+e.message; }
+  btn.disabled=false; btn.textContent="Poora system khud dekho aur bug dhoondo";
+};
 
 document.getElementById("check").onclick=async()=>{
   harvest();
