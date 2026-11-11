@@ -273,13 +273,28 @@ Rules:
 5. Aakhir me chhota summary: kya kiya, kya baaki hai.`;
 
 async function geminiModel(key){
+  if(models.gemini && /deep-research|thinking|image|tts|audio|live/i.test(models.gemini)){ models.gemini=null; save(); }
   if(models.gemini) return models.gemini;
   const r=await safeFetch(PROVIDERS[5].base+"/models?pageSize=200",{headers:{"x-goog-api-key":key}});
   if(!r.ok){ const raw=await r.text(); const er=new Error(explain(r.status,raw)); er.status=r.status; throw er; }
   const j=await r.json();
-  const names=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent")).map(m=>String(m.name).replace(/^models\//,""));
-  const score=n=>{let v=0;if(/flash/i.test(n))v+=4;if(/latest/i.test(n))v+=2;if(/preview|exp|thinking|lite|image|tts|audio|embed/i.test(n))v-=4;const m=n.match(/(\d+(?:\.\d+)?)/);v+=m?Number(m[1]):0;return v;};
-  models.gemini=[...names].sort((a,b)=>score(b)-score(a))[0]; save();
+  const BAD=/deep-research|thinking|exp-|experimental|embedding|aqa|image|tts|audio|live|vision|learnlm|gemma/i;
+  const names=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent"))
+    .map(m=>String(m.name).replace(/^models\//,""))
+    .filter(n=>!BAD.test(n));                       /* research/thinking/image models hata do */
+  const score=n=>{
+    let v=0;
+    if(/flash/i.test(n)) v+=6;                      /* chat ke liye sabse sasta/tez */
+    if(/latest/i.test(n)) v+=3;                     /* stable alias */
+    if(/preview|beta/i.test(n)) v-=3;               /* preview = quota jaldi khatam */
+    if(/pro/i.test(n)) v-=1;                        /* pro mehnga */
+    const m=n.match(/(\d+(?:\.\d+)?)/); v+=m?Number(m[1]):0;
+    return v;
+  };
+  const sorted=[...names].sort((a,b)=>score(b)-score(a));
+  models.gemini=sorted[0];
+  if(!models.gemini) throw new Error("gemini me koi chat model nahi mila — key/project check karo");
+  save();
   return models.gemini;
 }
 
