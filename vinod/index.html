@@ -141,7 +141,7 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
 const KSTORE="seetal-keys-v1";
 const LEGACY="vinod-keys-v1";
 const MIRROR="seetal-keys-mirror-v1";
-const BROWSER_OK={groq:true,openai:true,openrouter:true,gemini:true,deepseek:false,kimi:false};
+const BROWSER_OK={groq:true,openai:true,openrouter:true,gemini:true,deepseek:true,kimi:true};
 const PROVIDERS=[
   {id:"groq",      name:"Groq",      kind:"openai", base:"https://api.groq.com/openai/v1",   model:"qwen/qwen3.8-27b"},
   {id:"openai",    name:"OpenAI",    kind:"openai", base:"https://api.openai.com/v1",        model:"gpt-4o-mini"},
@@ -159,6 +159,8 @@ const TOOLS=[
  ["fetch_text",'{"url":"https://en.wikipedia.org/wiki/India"}',"allowlist ya apni site ka text padho"],
  ["system_check","{}","Seetal ke saare apps/files ka HTTP + size + speed check"],
  ["lint_app",'{"url":"../film3d/"}',"app ke inline JS ka SYNTAX check (behaviour nahi)"],
+ ["read_source",'{"url":"../film3d/","offset":0}',"app ka asli code padho (3000 chars ek baar; aage ke liye offset badhao)"],
+ ["patch_app",'{"url":"../film3d/","find":"purana code (ek hi jagah milna chahiye)","replace":"naya code"}',"chhota fix lagao; poori fixed file download milti hai + syntax check hota hai"],
  ["make_app",'{"name":"x.html","html":"<!doctype html>..."}',"file banao + syntax check, download milega"],
  ["notes_list","{}","notes padho"],
  ["note_add",'{"text":"..."}',"note likho"]
@@ -220,7 +222,7 @@ function renderProvRows(){
       ${BROWSER_OK[p.id]===false?'<span style="font-size:10px;color:var(--amber);width:100%">⚠ browser se nahi chalega (CORS) — server/proxy chahiye</span>':''}`;
     provEl.appendChild(row);
     row.querySelector("[data-test]").onclick=()=>testOne(p.id);
-    row.querySelector("#m-"+p.id).onchange=e=>{ const v=e.target.value.trim(); if(v) models[p.id]=v; else delete models[p.id]; health[p.id]=undefined; save(); paint(); };
+    row.querySelector("#m-"+p.id).onchange=e=>{ const v=e.target.value.trim(); if(v) models[p.id]=v; else delete models[p.id]; if(p.id==="gemini") delete models.geminiAuto; health[p.id]=undefined; save(); paint(); };
     const inp=row.querySelector("#k-"+p.id);
     let tmr=null;
     inp.oninput=e=>{
@@ -272,29 +274,23 @@ Rules:
 4. Jo samajh na aaye, bolo "yeh samajh nahi aaya" — andaza mat lagao.
 5. Aakhir me chhota summary: kya kiya, kya baaki hai.`;
 
-async function geminiModel(key){
-  if(models.gemini && /deep-research|thinking|image|tts|audio|live/i.test(models.gemini)){ models.gemini=null; save(); }
-  if(models.gemini) return models.gemini;
+const geminiBad=new Set();
+async function geminiRanked(key){
   const r=await safeFetch(PROVIDERS[5].base+"/models?pageSize=200",{headers:{"x-goog-api-key":key}});
   if(!r.ok){ const raw=await r.text(); const er=new Error(explain(r.status,raw)); er.status=r.status; throw er; }
   const j=await r.json();
-  const BAD=/deep-research|thinking|exp-|experimental|embedding|aqa|image|tts|audio|live|vision|learnlm|gemma/i;
   const names=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent"))
     .map(m=>String(m.name).replace(/^models\//,""))
-    .filter(n=>!BAD.test(n));                       /* research/thinking/image models hata do */
-  const score=n=>{
-    let v=0;
-    if(/flash/i.test(n)) v+=6;                      /* chat ke liye sabse sasta/tez */
-    if(/latest/i.test(n)) v+=3;                     /* stable alias */
-    if(/preview|beta/i.test(n)) v-=3;               /* preview = quota jaldi khatam */
-    if(/pro/i.test(n)) v-=1;                        /* pro mehnga */
-    const m=n.match(/(\d+(?:\.\d+)?)/); v+=m?Number(m[1]):0;
-    return v;
-  };
-  const sorted=[...names].sort((a,b)=>score(b)-score(a));
-  models.gemini=sorted[0];
-  if(!models.gemini) throw new Error("gemini me koi chat model nahi mila — key/project check karo");
-  save();
+    .filter(n=>!/deep-research|robotics|computer-use|learnlm|gemma|aqa|imagen|veo|embed|tts|audio|image|live|native/i.test(n))
+    .filter(n=>!geminiBad.has(n));
+  const score=n=>{let v=0;if(/flash/i.test(n))v+=4;if(/latest/i.test(n))v+=2;if(/preview|exp|thinking|lite|image|tts|audio|embed/i.test(n))v-=4;if(/pro/i.test(n))v-=1;const m=n.match(/gemini-(\d+(?:\.\d+)?)/i);v+=m?Number(m[1]):0;return v;};
+  return names.sort((a,b)=>score(b)-score(a));
+}
+async function geminiModel(key){
+  if(models.gemini) return models.gemini;
+  const list=await geminiRanked(key);
+  if(!list.length) throw new Error("Gemini ka koi chat model nahi mila");
+  models.gemini=list[0]; models.geminiAuto=true; save();
   return models.gemini;
 }
 
@@ -311,7 +307,7 @@ function explain(status, raw){
   return raw ? String(raw).slice(0,90) : "pata nahi kya hua";
 }
 
-let FETCH_TIMEOUT=25000, RETRY_DELAY=700;
+let FETCH_TIMEOUT=20000, RETRY_DELAY=700;
 async function safeFetch(url, opts, tries){
   tries = tries==null ? 2 : tries;
   let lastErr=null;
@@ -332,7 +328,7 @@ async function safeFetch(url, opts, tries){
         : "browser ne request rok di (CORS/network) — is provider ko server se hi call kiya ja sakta hai");
       if(aborted) err.timeout=true; else err.cors=true;
       lastErr=err;
-      if(i<tries-1){ await sleep(RETRY_DELAY*(i+1)); continue; }
+      if(i<tries-1 && !aborted){ await sleep(RETRY_DELAY*(i+1)); continue; }   /* timeout par wahi cheez dobara nahi */
       throw err;
     }
   }
@@ -356,16 +352,26 @@ async function callProvider(p, messages){
   const key=keys[p.id];
   if(p.kind==="gemini"){
     const contents=messages.filter(x=>x.role!=="system").map(x=>({role:x.role==="assistant"?"model":"user",parts:[{text:x.content}]}));
-    for(let attempt=0;attempt<2;attempt++){
+    let lastErr=null;
+    for(let attempt=0;attempt<3;attempt++){
       const m=await geminiModel(key);
-      const r=await safeFetch(p.base+"/models/"+encodeURIComponent(m)+":generateContent",{
-        method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
-        body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents,generationConfig:{temperature:0.8,maxOutputTokens:3000}})});
+      const auto=!!models.geminiAuto;
+      let r;
+      try{
+        r=await safeFetch(p.base+"/models/"+encodeURIComponent(m)+":generateContent",{
+          method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},
+          body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents,generationConfig:{temperature:0.8,maxOutputTokens:3000}})});
+      }catch(e){
+        if(e.timeout && auto && attempt<2){ geminiBad.add(m); delete models.gemini; lastErr=e; continue; }   /* hang hua model chhodo, agla chuno */
+        throw e;
+      }
       if(r.ok){ const j=await r.json(); const c=j.candidates&&j.candidates[0]; return (c&&c.content&&c.content.parts||[]).map(x=>x.text||"").join(""); }
       const raw=await r.text();
-      if(r.status===404 && attempt===0){ delete models.gemini; continue; }   /* purana model naam — dobara chuno */
-      const er=new Error(explain(r.status,raw)); er.status=r.status; throw er;
+      const er=new Error(explain(r.status,raw)); er.status=r.status;
+      if(attempt<2 && (r.status===404 || (auto && (r.status>=500||r.status===400)))){ geminiBad.add(m); delete models.gemini; lastErr=er; continue; }
+      throw er;
     }
+    throw lastErr||new Error("Gemini ke saare model fail");
   }
   const base=String(p.base).replace(/\/+$/,"");
   let model=models[p.id]||p.model; const flags={}; let healed=false;
@@ -412,7 +418,7 @@ async function ask(messages, opts){
 }
 
 /* ---------- agent: tools + loop ---------- */
-const MAX_STEPS=6;
+const MAX_STEPS=8;
 const outputs=[];
 function readNotes(){ try{ const n=JSON.parse(localStorage.getItem("vinod-notes")||"[]"); return Array.isArray(n)?n:[]; }catch(e){ return []; } }
 
@@ -439,6 +445,7 @@ async function fetchSame(u){
   return {text:await r.text(), url:url.href};
 }
 
+const patched={};
 const TOOLIMPL={
   time_now: async()=>new Date().toString(),
   calc: async a=>{
@@ -464,6 +471,30 @@ const TOOLIMPL={
       +"\nKAMZOR: "+(weak.join(" | ")||"koi nahi");
   },
   lint_app: async a=>{ const {text,url}=await fetchSame(a.url); return url+" → "+lintText(text,url); },
+  read_source: async a=>{
+    const {text,url}=await fetchSame(a.url);
+    const off=Math.max(0,parseInt(a.offset,10)||0);
+    const chunk=text.slice(off,off+3000);
+    return url+" ["+off+"-"+(off+chunk.length)+" / "+text.length+" chars]\n"+chunk
+      +((off+chunk.length<text.length)?("\n...(aur code hai — offset="+(off+chunk.length)+" do)"):"\n[file khatam]");
+  },
+  patch_app: async a=>{
+    const find=String(a.find==null?"":a.find), rp=String(a.replace==null?"":a.replace);
+    if(!find) throw new Error("find khaali hai");
+    const key=String(a.url||"");
+    let cur=patched[key];
+    if(!cur){ const f=await fetchSame(key); cur={text:f.text,url:f.url,n:0}; }
+    const c=cur.text.split(find).length-1;
+    if(c!==1) throw new Error("find "+c+" jagah mila (ek hi jagah hona chahiye) — thoda lamba ya alag find do");
+    cur.text=cur.text.replace(find,()=>rp); cur.n++; patched[key]=cur;
+    const lint=lintText(cur.text,cur.url);
+    let name=cur.url.split("?")[0].split("/").filter(Boolean).pop()||"index.html";
+    if(!/\.[A-Za-z0-9]+$/.test(name)) name+=".html";
+    name="fixed-"+name;
+    const o={name,html:cur.text,lint}; const i=outputs.findIndex(x=>x.name===name);
+    if(i>=0) outputs[i]=o; else outputs.push(o);
+    return "patch #"+cur.n+" laga ("+name+") — "+lint;
+  },
   make_app: async a=>{
     const name=String(a.name||"").trim(); const html=String(a.html||"");
     if(!/^[A-Za-z0-9_.-]{1,60}$/.test(name)) throw new Error("file ka naam galat (sirf letters/numbers/._-)");
@@ -521,6 +552,7 @@ function agentPrompt(){
 }
 
 async function runAgent(task, onStep){
+  Object.keys(patched).forEach(k=>delete patched[k]);
   const trace=[]; let by="";
   const msgs=[{role:"user",content:agentPrompt()+"\n\nKAAM:\n"+task}];
   for(let step=1; step<=MAX_STEPS; step++){
@@ -567,7 +599,7 @@ document.getElementById("run").onclick=async()=>{
     let txt, by, trace=[];
     if(mode==="agent"||mode==="sysfix"){
       outputs.length=0;
-      const hint = mode==="sysfix" ? "\n\nSYSTEM-FIX: pehle system_check chalao, phir har app par lint_app chalao. Jo fail ho uski wajah batao aur fix ko make_app se file me banao." : "";
+      const hint = mode==="sysfix" ? "\n\nSYSTEM-FIX: pehle system_check chalao, phir har app par lint_app chalao. Jo error mile uska code read_source se padho (offset badha kar), wajah dhundho, phir patch_app se chhote find/replace patch lagao. Badi file ko make_app se poora dobara mat likho." : "";
       const r=await runAgent(task+hint,(step,call,res)=>bub("t","STEP "+step+" · "+call.tool+" "+JSON.stringify(call.args||{}).slice(0,100)+"\n→ "+String(res).slice(0,220)));
       txt=r.final; by=r.by; trace=r.trace;
     }else{
@@ -815,8 +847,11 @@ document.getElementById("testKeys").onclick=async()=>{
       const txt=await callProvider(p,[{role:"user",content:"Sirf ek shabd likho: OK"}]);
       const ms=Math.round(performance.now()-t0);
       const ok=String(txt).trim().length>0;
-      health[p.id]=ok?"ok":"bad"; save(); paint();
-      lines.push((ok?"✓ ":"✗ ")+p.name+" — "+ms+"ms"+(ok?" — "+(models[p.id]||p.model||""):""));
+      health[p.id]=ok?"ok":"bad";
+      if(!ok) errs[p.id]="jawab khaali aaya — model ne kuch nahi diya (galat model ya safety block)";
+      else delete errs[p.id];
+      save(); paint();
+      lines.push((ok?"✓ ":"✗ ")+p.name+" — "+ms+"ms"+(ok?" — "+(models[p.id]||p.model||""):" — jawab khaali aaya"));
       diagRow(p, p.kind==="gemini" ? (p.base+"/models/"+(models.gemini||"auto")+":generateContent") : (p.base+"/chat/completions"),
               models[p.id]||p.model, 200, "jawab: "+String(txt).slice(0,30), ms);
     }catch(e){
