@@ -135,12 +135,6 @@ details summary{cursor:pointer;font-family:"Azeret Mono",monospace;font-size:11p
 </div>
 
 <script>
-window.addEventListener("error",function(ev){
-  try{
-    const m=document.getElementById("msg");
-    if(m){ m.className="msg show bad"; m.textContent="System me ek error aaya: "+(ev.message||"?").slice(0,120)+" — page refresh karo ya Seetal ko batao."; }
-  }catch(e){}
-});
 /* Ek hi store — sab apps (Vinod, Seetal Agent, 3D studio) isi ko padhte hain.
    Isliye naya version aane par, refresh karne par, ya doosri app kholne par
    key dobara nahi daalni padti. */
@@ -219,7 +213,7 @@ function renderProvRows(){
     const row=document.createElement("div"); row.className="prow";
     const saved=keys[p.id]||"";
     const hint = saved ? ("saved: ••••"+saved.slice(-4)+" (nayi key daalne par badal jayegi)") : "API key paste karo";
-    row.innerHTML=`<span class="nm">${esc(p.name)}</span>
+    row.innerHTML=`<span class="nm">${p.name}</span>
       <input id="k-${p.id}" type="password" placeholder="${esc(hint)}" value="">
       <span class="st" id="s-${p.id}">—</span>
       <button data-test="${p.id}" style="padding:6px 9px;font-size:11px">test</button>
@@ -261,7 +255,7 @@ function paint(){
     const ee=document.getElementById("e-"+p.id);
     if(ee) ee.textContent=((h==="bad"||h==="cors")&&errs[p.id])?("wajah: "+errs[p.id]):"";
   });
-  const opts=prov.filter(p=>keys[p.id]).map(p=>`<option value="${p.id}">${esc(p.name)}${models[p.id]?" · "+models[p.id]:""}</option>`).join("");
+  const opts=prov.filter(p=>keys[p.id]).map(p=>`<option value="${p.id}">${p.name}${models[p.id]?" · "+models[p.id]:""}</option>`).join("");
   const cur=selEl.value;
   selEl.innerHTML='<option value="">(apne aap)</option>'+opts;
   if(cur && keys[cur]) selEl.value=cur;
@@ -354,13 +348,15 @@ async function pickOpenAIModel(p){
   return ids.slice().sort((a,b)=>score(b)-score(a))[0];
 }
 
+function cleanModel(m){ return String(m||"").trim().replace(/^~+/,""); }
+
 async function callProvider(p, messages){
   const key=keys[p.id];
   if(p.kind==="gemini"){
     const contents=messages.filter(x=>x.role!=="system").map(x=>({role:x.role==="assistant"?"model":"user",parts:[{text:x.content}]}));
     let lastErr=null;
     for(let attempt=0;attempt<3;attempt++){
-      const m=await geminiModel(key);
+      const m=cleanModel(await geminiModel(key));
       const auto=!!models.geminiAuto;
       let r;
       try{
@@ -380,7 +376,7 @@ async function callProvider(p, messages){
     throw lastErr||new Error("Gemini ke saare model fail");
   }
   const base=String(p.base).replace(/\/+$/,"");
-  let model=models[p.id]||p.model; const flags={}; let healed=false;
+  let model=cleanModel(models[p.id]||p.model); const flags={}; let healed=false;
   for(let attempt=0;attempt<4;attempt++){
     const body={model,messages:[{role:"system",content:SYSTEM},...messages]};
     if(!flags.noTemp) body.temperature=0.8;
@@ -882,19 +878,13 @@ document.getElementById("copyDiag").onclick=async()=>{
 document.getElementById("expKeys").onclick=()=>{
   harvest();
   const data=JSON.stringify({keys,models,health,custom,tasks},null,2);
+  const blob=new Blob([data],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="vinod-keys-backup.json";
+  document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},3000);
   try{ localStorage.setItem("vinod-last-backup", new Date().toISOString().slice(0,10)); }catch(e){}
-  try{ paintSaved(); }catch(e){}
-  try{
-    const blob=new Blob([data],{type:"application/json"});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a"); a.href=url; a.download="vinod-keys-backup.json";
-    document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},3000);
-    show("ok","Backup file download ho gayi — sambhal ke rakho.");
-  }catch(e){
-    /* download block ho jaye to text se copy kar do — kuch na khoye */
-    try{ navigator.clipboard.writeText(data); show("ok","Download nahi hua, par backup copy ho gaya — kahin save kar lo."); }
-    catch(e2){ prompt("Backup copy karo:", data); }
-  }
+  paintSaved();
+  show("ok","Backup file download ho gayi — sambhal ke rakho.");
 };
 document.getElementById("impKeys").onclick=()=>document.getElementById("impFile").click();
 document.getElementById("impFile").onchange=async (e)=>{
